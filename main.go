@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,9 @@ import (
 
 // Version is set at build time via -ldflags "-X main.Version=x.y.z".
 var Version = "dev"
+
+//go:embed all-options.yaml
+var allOptionsYAML []byte
 
 // Config mirrors the structure of work.yaml.
 type Config struct {
@@ -102,12 +106,53 @@ func main() {
 		},
 		ArgsUsage: "<input.md>",
 		Action:    run,
+		Commands: []*cli.Command{
+			{
+				Name:      "init",
+				Usage:     "Write an example configuration YAML with every option",
+				ArgsUsage: "[filename]",
+				Description: "Writes an exhaustively-commented md2pdf.yaml template to the current\n" +
+					"directory. With no filename (or 'auto'), the file is named\n" +
+					"md2pdf-YYYY-MM-DD.yaml. A literal {date} token in the filename is\n" +
+					"replaced with today's date.",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "force",
+						Aliases: []string{"f"},
+						Usage:   "overwrite existing file",
+					},
+				},
+				Action: runInit,
+			},
+		},
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "md2pdf: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func runInit(ctx context.Context, cmd *cli.Command) error {
+	date := time.Now().Format("2006-01-02")
+
+	name := cmd.Args().First()
+	if name == "" || name == "auto" {
+		name = fmt.Sprintf("md2pdf-%s.yaml", date)
+	} else {
+		name = strings.ReplaceAll(name, "{date}", date)
+	}
+
+	if _, err := os.Stat(name); err == nil && !cmd.Bool("force") {
+		return fmt.Errorf("%s already exists (use --force to overwrite)", name)
+	}
+
+	if err := os.WriteFile(name, allOptionsYAML, 0o644); err != nil {
+		return fmt.Errorf("writing config: %w", err)
+	}
+
+	fmt.Printf("Created %s\n", name)
+	return nil
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {

@@ -1,0 +1,162 @@
+# =============================================================================
+# go-md2pdf — Exhaustive Configuration Reference
+# =============================================================================
+#
+# This file documents every available YAML configuration option.
+# All values shown are examples; defaults are noted in comments.
+#
+# Usage:
+#   md2pdf --config all-options.yaml document.md
+#
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# document — Shared document metadata (used by cover page and footer)
+# ---------------------------------------------------------------------------
+document:
+  title: "API Security Audit Report"       # Empty = auto-detect from H1 or filename
+  subtitle: "Northwind Trading Platform"    # Optional subtitle
+  version: "1.0"                            # Version string (cover and footer)
+  date: "auto"                              # "auto"          → YYYY-MM-DD
+                                            # "auto:DD/MM/YYYY" → custom format
+                                            # "auto:MMMM D, YYYY" → e.g. "January 5, 2025"
+                                            # "auto:iso"      → preset: YYYY-MM-DD
+                                            # "auto:european"  → preset: DD/MM/YYYY
+                                            # "auto:us"        → preset: MM/DD/YYYY
+                                            # "auto:long"      → preset: MMMM D, YYYY
+                                            # Or any literal string, e.g. "2025-01-15"
+                                            #
+                                            # Format tokens:
+                                            #   YYYY  – 4-digit year    YY   – 2-digit year
+                                            #   MMMM  – full month name MMM  – abbreviated month
+                                            #   MM    – zero-padded month M  – month without padding
+                                            #   DD    – zero-padded day   D  – day without padding
+                                            #   [text] – literal text escape
+
+  # Extended metadata fields
+  clientName: "Northwind Traders Inc."      # Client / customer name
+  projectName: "Platform Security Review"   # Project name
+  documentType: "Technical Specification"   # Document type label
+  documentID: "SEC-2024-Q4-001"             # Unique document identifier
+  description: "Comprehensive security audit of the Northwind trading API" # Brief summary
+
+# ---------------------------------------------------------------------------
+# author — Author metadata (used by cover page and signature block)
+# ---------------------------------------------------------------------------
+author:
+  name: "Sarah Chen"
+  title: "Senior Security Engineer"
+  email: "sarah.chen@ironclad-sec.io"
+  organization: "Ironclad Security Consulting"
+
+  # Extended metadata fields
+  phone: "+1 (555) 123-4567"               # Contact phone number
+  address: |                                # Postal address (YAML literal block for multiline)
+    123 Security Lane
+    Suite 456
+    San Francisco, CA 94105
+  department: "Application Security"        # Department name
+
+# ---------------------------------------------------------------------------
+# input — Input source options
+# ---------------------------------------------------------------------------
+input:
+  defaultDir: "./docs"                      # Default input directory (empty = must specify)
+
+# ---------------------------------------------------------------------------
+# output — Output destination options
+# ---------------------------------------------------------------------------
+output:
+  defaultDir: "./output"                    # Default output directory (empty = same as source)
+
+# ---------------------------------------------------------------------------
+# style — CSS style name or file path
+# ---------------------------------------------------------------------------
+# Built-in styles: academic, corporate, creative, default, invoice, legal,
+#                  manuscript, technical
+# Or provide a path to a custom .css file, e.g. "./custom-style.css"
+style: "technical"
+
+# ---------------------------------------------------------------------------
+# timeout — PDF generation timeout
+# ---------------------------------------------------------------------------
+# Go duration format: "30s", "2m", "1m30s", etc.
+# Empty = no timeout.
+timeout: "30s"
+
+# ---------------------------------------------------------------------------
+# cover — Cover page options
+# ---------------------------------------------------------------------------
+# Uses author.* and document.* fields for display.
+cover:
+  enabled: true
+  logo: "./assets/logo.png"                # Logo path or URL (.png, .jpg, .jpeg, .svg)
+  showDepartment: true                      # Show author.department on cover
+
+# ---------------------------------------------------------------------------
+# toc — Table of contents options
+# ---------------------------------------------------------------------------
+toc:
+  enabled: true
+  title: "Contents"                         # Empty = no title above TOC
+  minDepth: 2                               # 1–6 (default: 2, skips H1 document title)
+  maxDepth: 3                               # 1–6 (default: 3); must be >= minDepth
+
+# ---------------------------------------------------------------------------
+# footer — Page footer options
+# ---------------------------------------------------------------------------
+# Uses document.date and document.version for date/status display.
+footer:
+  enabled: true
+  position: "right"                         # "left", "center", "right" (default: "right")
+  showPageNumber: true                      # Show page numbers
+  showDocumentID: true                      # Display document.documentID in footer
+  text: "Confidential"                      # Optional free-form text
+
+# ---------------------------------------------------------------------------
+# signature — Signature block options
+# ---------------------------------------------------------------------------
+# Uses author.name, author.title, author.email, author.organization for display.
+signature:
+  enabled: true
+  imagePath: "./assets/signature.png"       # Signature image path or URL
+  links:                                    # Additional links shown in signature block
+    - label: "LinkedIn"
+      url: "https://linkedin.com/in/sarahchen"
+    - label: "Company Website"
+      url: "https://ironclad-sec.io"
+
+# ---------------------------------------------------------------------------
+# watermark — Background watermark options
+# ---------------------------------------------------------------------------
+watermark:
+  enabled: true
+  text: "CONFIDENTIAL"                      # Required when enabled (e.g. "DRAFT", "SECRET")
+  color: "#888888"                          # Hex color (default: "#888888")
+  opacity: 0.08                             # 0.0–1.0 (default: 0.1)
+  angle: -45                                # -90 to 90 degrees (default: -45)
+
+# ---------------------------------------------------------------------------
+# page — PDF page settings
+# ---------------------------------------------------------------------------
+page:
+  size: "letter"                            # "letter", "a4", "legal" (default: "letter")
+  orientation: "portrait"                   # "portrait", "landscape" (default: "portrait")
+  margin: 0.5                               # Inches, 0.25–3.0 (default: 0.5)
+
+# ---------------------------------------------------------------------------
+# pageBreaks — Page break control
+# ---------------------------------------------------------------------------
+pageBreaks:
+  enabled: true                             # Enable page break features
+  beforeH1: true                            # Page break before H1 headings
+  beforeH2: false                           # Page break before H2 headings
+  beforeH3: false                           # Page break before H3 headings
+  orphans: 2                                # Min lines at page bottom, 1–5 (default: 2)
+  widows: 2                                 # Min lines at page top, 1–5 (default: 2)
+
+# ---------------------------------------------------------------------------
+# assets — Asset loading options
+# ---------------------------------------------------------------------------
+assets:
+  basePath: ""                              # Custom assets directory; empty = use built-in assets
