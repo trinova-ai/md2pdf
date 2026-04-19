@@ -21,10 +21,12 @@ var Version = "dev"
 //go:embed all-options.yaml
 var allOptionsYAML []byte
 
-// Config mirrors the structure of work.yaml.
+// Config mirrors the structure of all-options.yaml.
 type Config struct {
 	Document   DocumentConfig   `yaml:"document"`
 	Author     AuthorConfig     `yaml:"author"`
+	Input      InputConfig      `yaml:"input"`
+	Output     OutputConfig     `yaml:"output"`
 	Page       PageConfig       `yaml:"page"`
 	PageBreaks PageBreaksConfig `yaml:"pageBreaks"`
 	Cover      CoverConfig      `yaml:"cover"`
@@ -32,15 +34,21 @@ type Config struct {
 	Signature  SignatureConfig  `yaml:"signature"`
 	Watermark  WatermarkConfig  `yaml:"watermark"`
 	Footer     FooterConfig     `yaml:"footer"`
+	Assets     AssetsConfig     `yaml:"assets"`
 	Style      string           `yaml:"style"`
+	Timeout    string           `yaml:"timeout"`
 }
 
 type DocumentConfig struct {
-	Title      string `yaml:"title"`
-	Subtitle   string `yaml:"subtitle"`
-	Version    string `yaml:"version"`
-	Date       string `yaml:"date"`
-	DocumentID string `yaml:"documentID"`
+	Title        string `yaml:"title"`
+	Subtitle     string `yaml:"subtitle"`
+	Version      string `yaml:"version"`
+	Date         string `yaml:"date"`
+	ClientName   string `yaml:"clientName"`
+	ProjectName  string `yaml:"projectName"`
+	DocumentType string `yaml:"documentType"`
+	DocumentID   string `yaml:"documentID"`
+	Description  string `yaml:"description"`
 }
 
 type AuthorConfig struct {
@@ -48,43 +56,76 @@ type AuthorConfig struct {
 	Title        string `yaml:"title"`
 	Organization string `yaml:"organization"`
 	Email        string `yaml:"email"`
+	Phone        string `yaml:"phone"`
+	Address      string `yaml:"address"`
+	Department   string `yaml:"department"`
+}
+
+type InputConfig struct {
+	DefaultDir string `yaml:"defaultDir"`
+}
+
+type OutputConfig struct {
+	DefaultDir string `yaml:"defaultDir"`
 }
 
 type PageConfig struct {
-	Size string `yaml:"size"`
+	Size        string  `yaml:"size"`
+	Orientation string  `yaml:"orientation"`
+	Margin      float64 `yaml:"margin"`
 }
 
 type PageBreaksConfig struct {
 	Enabled  bool `yaml:"enabled"`
 	BeforeH1 bool `yaml:"beforeH1"`
 	BeforeH2 bool `yaml:"beforeH2"`
+	BeforeH3 bool `yaml:"beforeH3"`
+	Orphans  int  `yaml:"orphans"`
+	Widows   int  `yaml:"widows"`
 }
 
 type CoverConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled        bool   `yaml:"enabled"`
+	Logo           string `yaml:"logo"`
+	ShowDepartment bool   `yaml:"showDepartment"`
 }
 
 type TOCConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Title    string `yaml:"title"`
+	MinDepth int    `yaml:"minDepth"`
 	MaxDepth int    `yaml:"maxDepth"`
 }
 
 type SignatureConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled   bool         `yaml:"enabled"`
+	ImagePath string       `yaml:"imagePath"`
+	Links     []LinkConfig `yaml:"links"`
+}
+
+type LinkConfig struct {
+	Label string `yaml:"label"`
+	URL   string `yaml:"url"`
 }
 
 type WatermarkConfig struct {
 	Enabled bool    `yaml:"enabled"`
 	Text    string  `yaml:"text"`
+	Color   string  `yaml:"color"`
 	Opacity float64 `yaml:"opacity"`
 	Angle   float64 `yaml:"angle"`
 }
 
 type FooterConfig struct {
-	Enabled        bool `yaml:"enabled"`
-	ShowPageNumber bool `yaml:"showPageNumber"`
-	ShowDocumentID bool `yaml:"showDocumentID"`
+	Enabled        bool   `yaml:"enabled"`
+	Position       string `yaml:"position"`
+	ShowPageNumber bool   `yaml:"showPageNumber"`
+	ShowDocumentID bool   `yaml:"showDocumentID"`
+	Text           string `yaml:"text"`
+}
+
+type AssetsConfig struct {
+	BasePath string `yaml:"basePath"`
 }
 
 func main() {
@@ -173,6 +214,10 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
+	// Resolve input path: if not found as given and input.defaultDir is set,
+	// try joining with defaultDir before giving up.
+	inputPath = resolveInputPath(inputPath, cfg.Input.DefaultDir)
+
 	// Read markdown file
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -191,13 +236,23 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	// Resolve output path
 	outPath := cmd.String("output")
 	if outPath == "" {
-		outPath = strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".pdf"
+		base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath)) + ".pdf"
+		if cfg.Output.DefaultDir != "" {
+			outPath = filepath.Join(cfg.Output.DefaultDir, base)
+		} else {
+			outPath = filepath.Join(filepath.Dir(inputPath), base)
+		}
+	}
+	if dir := filepath.Dir(outPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("creating output directory: %w", err)
+		}
 	}
 
-	// Resolve CSS from style name via the embedded asset loader
+	// Resolve CSS from style name via the asset loader (respects assets.basePath)
 	var css string
 	if cfg.Style != "" {
-		loader, loaderErr := md2pdf.NewAssetLoader("")
+		loader, loaderErr := md2pdf.NewAssetLoader(cfg.Assets.BasePath)
 		if loaderErr != nil {
 			return fmt.Errorf("initializing asset loader: %w", loaderErr)
 		}
@@ -207,8 +262,23 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Convert
-	conv, err := md2pdf.NewConverter()
+	// Build converter options from config
+	var opts []md2pdf.Option
+	if cfg.Assets.BasePath != "" {
+		opts = append(opts, md2pdf.WithAssetPath(cfg.Assets.BasePath))
+	}
+	if cfg.Timeout != "" {
+		d, err := time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			return fmt.Errorf("parsing timeout %q: %w", cfg.Timeout, err)
+		}
+		if d <= 0 {
+			return fmt.Errorf("timeout must be positive: %q", cfg.Timeout)
+		}
+		opts = append(opts, md2pdf.WithTimeout(d))
+	}
+
+	conv, err := md2pdf.NewConverter(opts...)
 	if err != nil {
 		return fmt.Errorf("initializing converter: %w", err)
 	}
@@ -225,6 +295,22 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Created %s\n", outPath)
 	return nil
+}
+
+// resolveInputPath tries the path as given first; if that file is missing and
+// defaultDir is set, it returns defaultDir/path. The caller will surface the
+// read error for the resolved path if still missing.
+func resolveInputPath(path, defaultDir string) string {
+	if defaultDir == "" {
+		return path
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(defaultDir, path)
 }
 
 // extractFrontmatter splits YAML frontmatter (between --- delimiters) from body.
@@ -271,10 +357,17 @@ func applyFrontmatter(fm map[string]string, cfg *Config) {
 	override("document.version", &cfg.Document.Version)
 	override("document.date", &cfg.Document.Date)
 	override("document.documentID", &cfg.Document.DocumentID)
+	override("document.clientName", &cfg.Document.ClientName)
+	override("document.projectName", &cfg.Document.ProjectName)
+	override("document.documentType", &cfg.Document.DocumentType)
+	override("document.description", &cfg.Document.Description)
 	override("author.name", &cfg.Author.Name)
 	override("author.title", &cfg.Author.Title)
 	override("author.organization", &cfg.Author.Organization)
 	override("author.email", &cfg.Author.Email)
+	override("author.phone", &cfg.Author.Phone)
+	override("author.address", &cfg.Author.Address)
+	override("author.department", &cfg.Author.Department)
 }
 
 // buildInput constructs md2pdf.Input from the resolved config.
@@ -286,7 +379,7 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 	}
 
 	if cfg.Cover.Enabled {
-		input.Cover = &md2pdf.Cover{
+		cover := &md2pdf.Cover{
 			Title:        cfg.Document.Title,
 			Subtitle:     cfg.Document.Subtitle,
 			Version:      cfg.Document.Version,
@@ -295,7 +388,16 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 			Author:       cfg.Author.Name,
 			AuthorTitle:  cfg.Author.Title,
 			Organization: cfg.Author.Organization,
+			Logo:         cfg.Cover.Logo,
+			ClientName:   cfg.Document.ClientName,
+			ProjectName:  cfg.Document.ProjectName,
+			DocumentType: cfg.Document.DocumentType,
+			Description:  cfg.Document.Description,
 		}
+		if cfg.Cover.ShowDepartment {
+			cover.Department = cfg.Author.Department
+		}
+		input.Cover = cover
 	}
 
 	if cfg.TOC.Enabled {
@@ -305,6 +407,7 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 		}
 		input.TOC = &md2pdf.TOC{
 			Title:    cfg.TOC.Title,
+			MinDepth: cfg.TOC.MinDepth,
 			MaxDepth: maxDepth,
 		}
 	}
@@ -315,20 +418,30 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 			docID = cfg.Document.DocumentID
 		}
 		input.Footer = &md2pdf.Footer{
+			Position:       cfg.Footer.Position,
 			ShowPageNumber: cfg.Footer.ShowPageNumber,
 			Date:           cfg.Document.Date,
 			Status:         cfg.Document.Version,
+			Text:           cfg.Footer.Text,
 			DocumentID:     docID,
 		}
 	}
 
 	if cfg.Signature.Enabled {
-		input.Signature = &md2pdf.Signature{
+		sig := &md2pdf.Signature{
 			Name:         cfg.Author.Name,
 			Title:        cfg.Author.Title,
 			Email:        cfg.Author.Email,
 			Organization: cfg.Author.Organization,
+			ImagePath:    cfg.Signature.ImagePath,
+			Phone:        cfg.Author.Phone,
+			Address:      cfg.Author.Address,
+			Department:   cfg.Author.Department,
 		}
+		for _, l := range cfg.Signature.Links {
+			sig.Links = append(sig.Links, md2pdf.Link{Label: l.Label, URL: l.URL})
+		}
+		input.Signature = sig
 	}
 
 	if cfg.Watermark.Enabled {
@@ -342,6 +455,7 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 		}
 		input.Watermark = &md2pdf.Watermark{
 			Text:    cfg.Watermark.Text,
+			Color:   cfg.Watermark.Color,
 			Opacity: opacity,
 			Angle:   angle,
 		}
@@ -351,18 +465,34 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 		input.PageBreaks = &md2pdf.PageBreaks{
 			BeforeH1: cfg.PageBreaks.BeforeH1,
 			BeforeH2: cfg.PageBreaks.BeforeH2,
-			Orphans:  md2pdf.DefaultOrphans,
-			Widows:   md2pdf.DefaultWidows,
+			BeforeH3: cfg.PageBreaks.BeforeH3,
+			Orphans:  orDefaultInt(cfg.PageBreaks.Orphans, md2pdf.DefaultOrphans),
+			Widows:   orDefaultInt(cfg.PageBreaks.Widows, md2pdf.DefaultWidows),
 		}
 	}
 
-	if cfg.Page.Size != "" {
+	if cfg.Page.Size != "" || cfg.Page.Orientation != "" || cfg.Page.Margin != 0 {
+		orientation := cfg.Page.Orientation
+		if orientation == "" {
+			orientation = md2pdf.OrientationPortrait
+		}
+		margin := cfg.Page.Margin
+		if margin == 0 {
+			margin = md2pdf.DefaultMargin
+		}
 		input.Page = &md2pdf.PageSettings{
 			Size:        cfg.Page.Size,
-			Orientation: md2pdf.OrientationPortrait,
-			Margin:      md2pdf.DefaultMargin,
+			Orientation: orientation,
+			Margin:      margin,
 		}
 	}
 
 	return input
+}
+
+func orDefaultInt(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
 }
