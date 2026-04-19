@@ -17,21 +17,9 @@ document:
   title: "API Security Audit Report"       # Empty = auto-detect from H1 or filename
   subtitle: "Northwind Trading Platform"    # Optional subtitle
   version: "1.0"                            # Version string (cover and footer)
-  date: "auto"                              # "auto"          → YYYY-MM-DD
-                                            # "auto:DD/MM/YYYY" → custom format
-                                            # "auto:MMMM D, YYYY" → e.g. "January 5, 2025"
-                                            # "auto:iso"      → preset: YYYY-MM-DD
-                                            # "auto:european"  → preset: DD/MM/YYYY
-                                            # "auto:us"        → preset: MM/DD/YYYY
-                                            # "auto:long"      → preset: MMMM D, YYYY
+  date: "auto"                              # "auto" → today's date, long format
+                                            #          (e.g. "5 January 2025")
                                             # Or any literal string, e.g. "2025-01-15"
-                                            #
-                                            # Format tokens:
-                                            #   YYYY  – 4-digit year    YY   – 2-digit year
-                                            #   MMMM  – full month name MMM  – abbreviated month
-                                            #   MM    – zero-padded month M  – month without padding
-                                            #   DD    – zero-padded day   D  – day without padding
-                                            #   [text] – literal text escape
 
   # Extended metadata fields
   clientName: "Northwind Traders Inc."      # Client / customer name
