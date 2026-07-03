@@ -35,7 +35,7 @@ Implemented, in a single ~500-line `main.go`:
   Watermark, PageBreaks, Page); style CSS resolved through the library's asset
   loader. Single file in, single PDF out; `-o` overrides the output path.
 - **Library** — vendored at `alnah:picoloom`, upstream v2.1.2 plus a
-  three-commit patch stack (ADR-001).
+  local patch stack (ADR-001).
 
 Not implemented: transformer pipeline, temp workspace, Mermaid rendering,
 batch/directory input, `watermark` frontmatter, frontmatter validation,
@@ -46,11 +46,13 @@ a hand-rendered SVG referenced from the markdown.
 
 The original premise — "use upstream untouched, never fork" — is retired.
 Upstream renamed to `picoloom` (module `github.com/alnah/picoloom/v2`) and we
-carry three local commits on the vendored copy, rebased onto `origin/main`:
+carry a patch stack of local commits on the vendored copy, rebased onto
+`origin/main` (`git log origin/main..main` there is authoritative):
 
 1. `fix: keep pre-numbered headings from double numbering in TOC`
 2. `feat: embed PDF document outline from headings`
 3. `feat: add TOC.DisableNumbering to list headings verbatim`
+4. `fix: no blank page after cover/TOC when BeforeH1 is set`
 
 Sync procedure: in `alnah:picoloom/` run `git fetch origin && git rebase
 origin/main`, resolve conflicts (most likely `internal/pipeline/tocinject.go`),
