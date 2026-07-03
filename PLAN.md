@@ -115,12 +115,12 @@ a no-op so this lands without behavior change.
 
 #### G1.1.1: Create the transform package
 
-- [ ] Add `transform/transform.go` with the `Transformer` interface and a
+- [x] Add `transform/transform.go` with the `Transformer` interface and a
       `Pipeline` type (`NewPipeline(...Transformer)`, `Run(content, workDir,
       sourceDir) (string, error)`).
-- [ ] Empty pipeline returns input unchanged; first error aborts and is
+- [x] Empty pipeline returns input unchanged; first error aborts and is
       wrapped with the failing transformer's name.
-- [ ] Add `transform/transform_test.go`: ordering, error propagation,
+- [x] Add `transform/transform_test.go`: ordering, error propagation,
       zero-transformer pass-through.
 
 #### G1.1.2: Temp workspace
