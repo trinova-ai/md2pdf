@@ -11,6 +11,7 @@ import (
 	"time"
 
 	md2pdf "github.com/alnah/picoloom/v2"
+	"github.com/trinova/md2pdf/transform"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -147,6 +148,10 @@ func main() {
 				Aliases: []string{"o"},
 				Usage:   "output PDF `FILE` (default: input with .pdf extension)",
 			},
+			&cli.BoolFlag{
+				Name:  "keep-workspace",
+				Usage: "keep the transformer workspace directory and print its path (for debugging)",
+			},
 		},
 		ArgsUsage: "<input.md | config.yaml>",
 		Action:    run,
@@ -260,6 +265,24 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	// Extract frontmatter and body; frontmatter overrides config
 	body, fm := extractFrontmatter(string(data))
 	applyFrontmatter(fm, cfg)
+
+	// Run the transformer pipeline over the body in a disposable workspace.
+	// The pipeline is empty for now; concrete transformers (Mermaid, …)
+	// register here as they land. Generated files must be referenced by
+	// absolute path, since Input.SourceDir stays at the source directory.
+	ws, err := transform.NewWorkspace()
+	if err != nil {
+		return fmt.Errorf("creating workspace: %w", err)
+	}
+	if cmd.Bool("keep-workspace") {
+		fmt.Fprintf(os.Stderr, "md2pdf: keeping workspace %s\n", ws.Dir())
+	} else {
+		defer ws.Cleanup()
+	}
+	body, err = transform.NewPipeline().Run(body, ws.Dir(), filepath.Dir(inputPath))
+	if err != nil {
+		return fmt.Errorf("transforming: %w", err)
+	}
 
 	// Resolve "auto" date
 	if strings.EqualFold(cfg.Document.Date, "auto") {

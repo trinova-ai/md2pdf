@@ -132,13 +132,13 @@ a no-op so this lands without behavior change.
 
 #### G1.1.3: Wire the pipeline into run()
 
-- [ ] In `run()`: create a workspace per conversion, run the (currently empty)
+- [x] In `run()`: create a workspace per conversion, run the (currently empty)
       pipeline between frontmatter extraction and `buildInput()`.
-- [ ] Add `--keep-workspace` flag: skip cleanup and print the path for
+- [x] Add `--keep-workspace` flag: skip cleanup and print the path for
       debugging; document it in `--help`.
-- [ ] Ensure `Input.SourceDir` still points at the source file's directory and
+- [x] Ensure `Input.SourceDir` still points at the source file's directory and
       generated-file references will resolve (absolute paths from transformers).
-- [ ] Smoke-test: converting `testdata/trust-anchor-strategy.md` produces the
+- [x] Smoke-test: converting `testdata/trust-anchor-strategy.md` produces the
       same PDF as before the change.
 
 ### G1.2: Mermaid transformer
