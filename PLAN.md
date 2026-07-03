@@ -217,12 +217,12 @@ The two decisions the README must tell truthfully:
 
 ![[#ADR-002: Dotted frontmatter keys]]
 
-- [ ] Correct the module path (`github.com/trinova/md2pdf`, not `trinova-ai`)
+- [x] Correct the module path (`github.com/trinova/md2pdf`, not `trinova-ai`)
       or rename the module — pick one and make install instructions work.
-- [ ] Remove or scope upstream-inherited claims (e.g. "parallel batch
+- [x] Remove or scope upstream-inherited claims (e.g. "parallel batch
       processing") to what the wrapper actually does; add the vendoring story
       and the sync procedure from ADR-001.
-- [ ] Document the dotted frontmatter keys with a full example and the
+- [x] Document the dotted frontmatter keys with a full example and the
       data-priority chain.
 
 #### G3.1.2: Examples directory
