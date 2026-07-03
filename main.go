@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -593,6 +594,16 @@ func parseFrontmatter(raw string) (fm map[string]string, unknown []string, err e
 	known := frontmatterTargets(&Config{})
 	fm = make(map[string]string)
 	for key, val := range m {
+		if key == mermaidScaleKey {
+			s, err := frontmatterScaleValue(val)
+			if err != nil {
+				return nil, nil, err
+			}
+			if s != "" {
+				fm[key] = s
+			}
+			continue
+		}
 		if _, ok := known[key]; !ok {
 			unknown = append(unknown, key)
 			continue
@@ -611,6 +622,40 @@ func parseFrontmatter(raw string) (fm map[string]string, unknown []string, err e
 	}
 	sort.Strings(unknown)
 	return fm, unknown, nil
+}
+
+// mermaidScaleKey is the one numeric frontmatter key: it overrides
+// mermaid.scale per document. Unlike the string keys in frontmatterTargets,
+// bare YAML numbers are welcome here (mermaid.scale: 0.62); quoted numbers
+// work too.
+const mermaidScaleKey = "mermaid.scale"
+
+// frontmatterScaleValue validates a mermaid.scale frontmatter value and
+// normalizes it to its string form for the fm map. A bare `key:` (nil) is
+// treated as absent; anything that is not a positive number is rejected.
+func frontmatterScaleValue(val any) (string, error) {
+	switch v := val.(type) {
+	case float64:
+		if v <= 0 {
+			return "", fmt.Errorf("frontmatter %s: must be a positive number, got %v", mermaidScaleKey, v)
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	case int:
+		if v <= 0 {
+			return "", fmt.Errorf("frontmatter %s: must be a positive number, got %d", mermaidScaleKey, v)
+		}
+		return strconv.Itoa(v), nil
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f <= 0 {
+			return "", fmt.Errorf("frontmatter %s: must be a positive number, got %q", mermaidScaleKey, v)
+		}
+		return v, nil
+	case nil:
+		return "", nil
+	default:
+		return "", fmt.Errorf("frontmatter %s: must be a positive number, got %v", mermaidScaleKey, v)
+	}
 }
 
 // frontmatterTargets maps every known dotted frontmatter key to the config
@@ -651,6 +696,14 @@ func applyFrontmatter(fm map[string]string, cfg *Config) {
 	// watermark off. An empty value is ignored like any other override.
 	if v, ok := fm["watermark.text"]; ok && v != "" {
 		cfg.Watermark.Enabled = true
+	}
+
+	// mermaid.scale is numeric; parseFrontmatter validated it as a positive
+	// number, so a parse failure here cannot happen and is simply ignored.
+	if v, ok := fm[mermaidScaleKey]; ok && v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			cfg.Mermaid.Scale = f
+		}
 	}
 }
 

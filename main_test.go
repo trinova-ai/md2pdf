@@ -255,6 +255,61 @@ func TestParseFrontmatterNonStringKnownScalar(t *testing.T) {
 	}
 }
 
+// TestParseFrontmatterMermaidScale: the one numeric frontmatter key accepts
+// bare YAML numbers and quoted strings, and rejects non-positive or
+// non-numeric values.
+func TestParseFrontmatterMermaidScale(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    string // expected fm["mermaid.scale"]; "" = absent
+		wantErr string // substring of the error; "" = no error
+	}{
+		{name: "bare float", raw: "mermaid.scale: 0.62", want: "0.62"},
+		{name: "bare int", raw: "mermaid.scale: 2", want: "2"},
+		{name: "quoted number", raw: `mermaid.scale: "0.75"`, want: "0.75"},
+		{name: "null is absent", raw: "mermaid.scale:", want: ""},
+		{name: "zero rejected", raw: "mermaid.scale: 0", wantErr: "positive number"},
+		{name: "negative rejected", raw: "mermaid.scale: -1.5", wantErr: "positive number"},
+		{name: "non-numeric rejected", raw: "mermaid.scale: big", wantErr: "positive number"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fm, unknown, err := parseFrontmatter(tt.raw)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want containing %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseFrontmatter() error = %v, want nil", err)
+			}
+			if got := fm["mermaid.scale"]; got != tt.want {
+				t.Errorf("fm[mermaid.scale] = %q, want %q", got, tt.want)
+			}
+			if len(unknown) != 0 {
+				t.Errorf("unknown = %v, want none (mermaid.scale is a known key)", unknown)
+			}
+		})
+	}
+}
+
+// TestApplyFrontmatterMermaidScale: the parsed value lands on cfg.Mermaid.Scale.
+func TestApplyFrontmatterMermaidScale(t *testing.T) {
+	cfg := &Config{}
+	applyFrontmatter(map[string]string{"mermaid.scale": "0.62"}, cfg)
+	if cfg.Mermaid.Scale != 0.62 {
+		t.Errorf("Mermaid.Scale = %v, want 0.62", cfg.Mermaid.Scale)
+	}
+
+	cfg = &Config{Mermaid: MermaidConfig{Scale: 1.5}}
+	applyFrontmatter(map[string]string{}, cfg)
+	if cfg.Mermaid.Scale != 1.5 {
+		t.Errorf("Mermaid.Scale = %v after empty frontmatter, want 1.5 preserved", cfg.Mermaid.Scale)
+	}
+}
+
 // TestParseFrontmatterUnknownKeysExempt: unknown keys escape validation
 // entirely — non-string scalars and values beyond the cap are fine, because
 // they are never applied. Guards real documents carrying long private

@@ -158,6 +158,8 @@ mermaid:
                                             # <1 shrinks (0.75 ≈ body text), >1
                                             # enlarges. Wide diagrams always shrink
                                             # to fit the page width.
+                                            # Frontmatter: `mermaid.scale: 0.62`
+                                            # overrides per document (bare number OK).
 
 # ---------------------------------------------------------------------------
 # pageBreaks — Page break control

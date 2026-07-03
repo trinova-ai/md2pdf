@@ -119,6 +119,9 @@ Rules:
 - Supported keys: every `document.*` and `author.*` field, plus
   `watermark.text`, which sets the text **and** enables the watermark for that
   document even when the config leaves the watermark off.
+- `mermaid.scale` is the one numeric key: it overrides the diagram symbol
+  size per document (see [Transformers](#transformers)). Bare numbers are
+  fine here: `mermaid.scale: 0.62`.
 - Unknown keys are ignored; run with `--verbose` to list them and catch typos.
 - `document.date: "auto"` resolves to today's date in long format.
 
