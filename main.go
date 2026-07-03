@@ -8,8 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	md2pdf "github.com/alnah/picoloom/v2"
 	"github.com/trinova/md2pdf/transform"
@@ -152,6 +154,10 @@ func main() {
 			&cli.BoolFlag{
 				Name:  "keep-workspace",
 				Usage: "keep the transformer workspace directory and print its path (for debugging)",
+			},
+			&cli.BoolFlag{
+				Name:  "verbose",
+				Usage: "list ignored unknown frontmatter keys (typo discovery)",
 			},
 		},
 		ArgsUsage: "<input.md | input-dir | config.yaml>",
@@ -322,8 +328,18 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	// Extract frontmatter and body; frontmatter overrides config
-	body, fm := extractFrontmatter(string(data))
+	// Extract frontmatter and body; frontmatter overrides config. Known keys
+	// are validated (length cap, string type); unknown keys stay ignored per
+	// ADR-002 but --verbose lists them so typos are discoverable.
+	body, fm, unknown, err := extractFrontmatter(string(data))
+	if err != nil {
+		return err
+	}
+	if cmd.Bool("verbose") {
+		for _, k := range unknown {
+			fmt.Fprintf(os.Stderr, "md2pdf: ignoring unknown frontmatter key %q\n", k)
+		}
+	}
 	applyFrontmatter(fm, &cfg)
 
 	// Run the transformer pipeline over the body in a disposable workspace.
@@ -499,13 +515,12 @@ func resolveInputPath(path, defaultDir string) string {
 
 // extractFrontmatter splits YAML frontmatter (between --- delimiters) from body.
 // The frontmatter uses flat dotted keys: "document.title", "author.name", etc.
-// which are parsed directly as a map[string]string by the YAML library.
-func extractFrontmatter(content string) (body string, fm map[string]string) {
-	fm = make(map[string]string)
-
+// Known keys are validated (string type, length cap); unknown keys are ignored
+// per ADR-002 and returned sorted so --verbose can list them.
+func extractFrontmatter(content string) (body string, fm map[string]string, unknown []string, err error) {
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	if !scanner.Scan() || strings.TrimSpace(scanner.Text()) != "---" {
-		return content, fm
+		return content, map[string]string{}, nil, nil
 	}
 
 	var fmLines []string
@@ -522,42 +537,89 @@ func extractFrontmatter(content string) (body string, fm map[string]string) {
 		bodyLines = append(bodyLines, scanner.Text())
 	}
 
-	// The dotted keys ("document.title" etc.) are valid YAML string keys,
-	// so a standard unmarshal into map[string]string gives us exactly what we need.
-	_ = yaml.Unmarshal([]byte(strings.Join(fmLines, "\n")), &fm)
+	fm, unknown, err = parseFrontmatter(strings.Join(fmLines, "\n"))
+	if err != nil {
+		return "", nil, nil, err
+	}
+	return strings.Join(bodyLines, "\n"), fm, unknown, nil
+}
 
-	return strings.Join(bodyLines, "\n"), fm
+// maxFrontmatterValueLen caps the values of KNOWN frontmatter keys — the ones
+// that land on the cover — so a stray paste cannot blow up the layout. Unknown
+// keys are exempt: they are never applied, and existing documents legitimately
+// carry long private metadata (e.g. a version-history line).
+const maxFrontmatterValueLen = 500
+
+// parseFrontmatter decodes a raw YAML block of dotted keys and validates the
+// known ones: values must be strings (quote numbers like "2.5") no longer than
+// maxFrontmatterValueLen. Unknown keys are ignored entirely — any value type,
+// any length — and returned sorted for --verbose reporting.
+func parseFrontmatter(raw string) (fm map[string]string, unknown []string, err error) {
+	var m map[string]any
+	if err := yaml.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, nil, fmt.Errorf("frontmatter: %w", err)
+	}
+
+	known := frontmatterTargets(&Config{})
+	fm = make(map[string]string)
+	for key, val := range m {
+		if _, ok := known[key]; !ok {
+			unknown = append(unknown, key)
+			continue
+		}
+		switch v := val.(type) {
+		case string:
+			if utf8.RuneCountInString(v) > maxFrontmatterValueLen {
+				return nil, nil, fmt.Errorf("frontmatter %s: value exceeds %d characters", key, maxFrontmatterValueLen)
+			}
+			fm[key] = v
+		case nil:
+			// A bare `key:` means no value — same as an absent key.
+		default:
+			return nil, nil, fmt.Errorf("frontmatter %s: value must be a string (quote it: %q)", key, fmt.Sprintf("%v", v))
+		}
+	}
+	sort.Strings(unknown)
+	return fm, unknown, nil
+}
+
+// frontmatterTargets maps every known dotted frontmatter key to the config
+// field it overrides. applyFrontmatter and parseFrontmatter both derive from
+// this table, so the applied and the validated key sets can never drift apart.
+func frontmatterTargets(cfg *Config) map[string]*string {
+	return map[string]*string{
+		"document.title":        &cfg.Document.Title,
+		"document.subtitle":     &cfg.Document.Subtitle,
+		"document.version":      &cfg.Document.Version,
+		"document.date":         &cfg.Document.Date,
+		"document.documentID":   &cfg.Document.DocumentID,
+		"document.clientName":   &cfg.Document.ClientName,
+		"document.projectName":  &cfg.Document.ProjectName,
+		"document.documentType": &cfg.Document.DocumentType,
+		"document.description":  &cfg.Document.Description,
+		"author.name":           &cfg.Author.Name,
+		"author.title":          &cfg.Author.Title,
+		"author.organization":   &cfg.Author.Organization,
+		"author.email":          &cfg.Author.Email,
+		"author.phone":          &cfg.Author.Phone,
+		"author.address":        &cfg.Author.Address,
+		"author.department":     &cfg.Author.Department,
+		"watermark.text":        &cfg.Watermark.Text,
+	}
 }
 
 // applyFrontmatter overrides config fields using the frontmatter dotted key map.
 func applyFrontmatter(fm map[string]string, cfg *Config) {
-	override := func(key string, target *string) {
+	for key, target := range frontmatterTargets(cfg) {
 		if v, ok := fm[key]; ok && v != "" {
 			*target = v
 		}
 	}
-	override("document.title", &cfg.Document.Title)
-	override("document.subtitle", &cfg.Document.Subtitle)
-	override("document.version", &cfg.Document.Version)
-	override("document.date", &cfg.Document.Date)
-	override("document.documentID", &cfg.Document.DocumentID)
-	override("document.clientName", &cfg.Document.ClientName)
-	override("document.projectName", &cfg.Document.ProjectName)
-	override("document.documentType", &cfg.Document.DocumentType)
-	override("document.description", &cfg.Document.Description)
-	override("author.name", &cfg.Author.Name)
-	override("author.title", &cfg.Author.Title)
-	override("author.organization", &cfg.Author.Organization)
-	override("author.email", &cfg.Author.Email)
-	override("author.phone", &cfg.Author.Phone)
-	override("author.address", &cfg.Author.Address)
-	override("author.department", &cfg.Author.Department)
 
 	// watermark.text both sets the text and enables the watermark, so a
 	// document can declare itself DRAFT even when the config leaves the
 	// watermark off. An empty value is ignored like any other override.
 	if v, ok := fm["watermark.text"]; ok && v != "" {
-		cfg.Watermark.Text = v
 		cfg.Watermark.Enabled = true
 	}
 }

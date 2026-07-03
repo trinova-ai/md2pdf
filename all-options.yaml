@@ -13,6 +13,11 @@
 # ---------------------------------------------------------------------------
 # document — Shared document metadata (used by cover page and footer)
 # ---------------------------------------------------------------------------
+# Frontmatter: a document can override any document.* or author.* field (and
+# watermark.text) with dotted keys in its YAML frontmatter, e.g.
+# `document.title: "My Title"`. Values must be quoted strings of at most 500
+# characters (quote numbers: `document.version: "2.5"`). Unknown keys are
+# ignored; run with --verbose to list them and catch typos.
 document:
   title: "API Security Audit Report"       # Empty = auto-detect from H1 or filename
   subtitle: "Northwind Trading Platform"    # Optional subtitle

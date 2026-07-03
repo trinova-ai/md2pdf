@@ -198,11 +198,11 @@ Follows the dotted-key convention:
 
 #### G2.2.2: Frontmatter validation
 
-- [ ] Reject absurd values early with clear errors: field length caps and
+- [x] Reject absurd values early with clear errors: field length caps and
       non-string scalars where strings are expected.
-- [ ] Unknown dotted keys keep being ignored, but `--verbose` (new flag) lists
+- [x] Unknown dotted keys keep being ignored, but `--verbose` (new flag) lists
       them so typos are discoverable.
-- [ ] Tests: over-long title rejected; unknown key silent by default, listed
+- [x] Tests: over-long title rejected; unknown key silent by default, listed
       under `--verbose`.
 
 ## Phase P3: Honest documentation

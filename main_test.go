@@ -198,6 +198,134 @@ func TestApplyFrontmatterWatermark(t *testing.T) {
 	})
 }
 
+// TestParseFrontmatterOverlongKnownValue: a known key whose value exceeds the
+// cap is rejected, naming the key; a value exactly at the cap passes.
+func TestParseFrontmatterOverlongKnownValue(t *testing.T) {
+	long := strings.Repeat("x", maxFrontmatterValueLen+1)
+	_, _, err := parseFrontmatter("document.title: " + long)
+	if err == nil {
+		t.Fatal("over-long document.title: got nil, want error")
+	}
+	for _, want := range []string{"document.title", "exceeds 500 characters"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %q, missing %q", err, want)
+		}
+	}
+
+	atCap := strings.Repeat("x", maxFrontmatterValueLen)
+	fm, _, err := parseFrontmatter("document.title: " + atCap)
+	if err != nil {
+		t.Fatalf("value at cap: %v", err)
+	}
+	if fm["document.title"] != atCap {
+		t.Error("value at cap was not applied")
+	}
+}
+
+// TestParseFrontmatterUnknownKey: unknown keys never error — they are ignored
+// (not applied) and reported in the sorted unknown list for --verbose.
+func TestParseFrontmatterUnknownKey(t *testing.T) {
+	fm, unknown, err := parseFrontmatter("status: Draft\nowner: TriNova\ndocument.title: T")
+	if err != nil {
+		t.Fatalf("parseFrontmatter: %v", err)
+	}
+	if want := []string{"owner", "status"}; !reflect.DeepEqual(unknown, want) {
+		t.Errorf("unknown = %v, want %v (sorted)", unknown, want)
+	}
+	if _, ok := fm["status"]; ok {
+		t.Error("unknown key leaked into the applied map")
+	}
+	if fm["document.title"] != "T" {
+		t.Errorf("document.title = %q, want %q", fm["document.title"], "T")
+	}
+}
+
+// TestParseFrontmatterNonStringKnownScalar: an unquoted number for a known key
+// must not be silently dropped (the old behavior) — it errors with a hint to
+// quote the value.
+func TestParseFrontmatterNonStringKnownScalar(t *testing.T) {
+	_, _, err := parseFrontmatter("document.version: 2.5")
+	if err == nil {
+		t.Fatal("non-string document.version: got nil, want error")
+	}
+	for _, want := range []string{"document.version", "must be a string", `quote it: "2.5"`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %q, missing %q", err, want)
+		}
+	}
+}
+
+// TestParseFrontmatterUnknownKeysExempt: unknown keys escape validation
+// entirely — non-string scalars and values beyond the cap are fine, because
+// they are never applied. Guards real documents carrying long private
+// metadata (e.g. CrunchGate's ~600-char version-history).
+func TestParseFrontmatterUnknownKeysExempt(t *testing.T) {
+	raw := "weight: 2.5\nversion-history: \"" + strings.Repeat("h", maxFrontmatterValueLen+100) + "\""
+	fm, unknown, err := parseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("unknown keys must be exempt from validation, got: %v", err)
+	}
+	if want := []string{"version-history", "weight"}; !reflect.DeepEqual(unknown, want) {
+		t.Errorf("unknown = %v, want %v", unknown, want)
+	}
+	if len(fm) != 0 {
+		t.Errorf("fm = %v, want empty", fm)
+	}
+}
+
+// TestParseFrontmatterNullKnownKey: a bare `key:` (YAML null) is treated as an
+// absent key, not a type error.
+func TestParseFrontmatterNullKnownKey(t *testing.T) {
+	fm, _, err := parseFrontmatter("document.title:")
+	if err != nil {
+		t.Fatalf("null known key: %v", err)
+	}
+	if _, ok := fm["document.title"]; ok {
+		t.Error("null value must not land in the applied map")
+	}
+}
+
+// TestExtractFrontmatterEndToEnd: body split, applied map, unknown list, and
+// error propagation through the extraction wrapper.
+func TestExtractFrontmatterEndToEnd(t *testing.T) {
+	t.Run("valid frontmatter", func(t *testing.T) {
+		body, fm, unknown, err := extractFrontmatter("---\ndocument.title: \"T\"\nowner: X\n---\n# body\n")
+		if err != nil {
+			t.Fatalf("extractFrontmatter: %v", err)
+		}
+		if body != "# body" {
+			t.Errorf("body = %q, want %q", body, "# body")
+		}
+		if fm["document.title"] != "T" {
+			t.Errorf("document.title = %q, want %q", fm["document.title"], "T")
+		}
+		if want := []string{"owner"}; !reflect.DeepEqual(unknown, want) {
+			t.Errorf("unknown = %v, want %v", unknown, want)
+		}
+	})
+
+	t.Run("no frontmatter passes through", func(t *testing.T) {
+		content := "# just a doc\n"
+		body, fm, unknown, err := extractFrontmatter(content)
+		if err != nil {
+			t.Fatalf("extractFrontmatter: %v", err)
+		}
+		if body != content {
+			t.Errorf("body = %q, want unchanged input", body)
+		}
+		if len(fm) != 0 || len(unknown) != 0 {
+			t.Errorf("fm = %v, unknown = %v, want both empty", fm, unknown)
+		}
+	})
+
+	t.Run("validation error propagates", func(t *testing.T) {
+		_, _, _, err := extractFrontmatter("---\ndocument.version: 2.5\n---\nbody\n")
+		if err == nil || !strings.Contains(err.Error(), "document.version") {
+			t.Errorf("err = %v, want document.version validation error", err)
+		}
+	})
+}
+
 // TestConvertBatchAllFail: every failure is reported and counted.
 func TestConvertBatchAllFail(t *testing.T) {
 	files := []string{"x.md", "y.md"}
