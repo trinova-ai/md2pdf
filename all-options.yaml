@@ -148,6 +148,10 @@ pageBreaks:
   beforeH1: true                            # Page break before H1 headings
   beforeH2: false                           # Page break before H2 headings
   beforeH3: false                           # Page break before H3 headings
+  duplex: false                             # true = blank verso after cover/TOC so body
+                                            # starts on a fresh sheet when printing
+                                            # double-sided (false = no blank pages,
+                                            # reads better on screen)
   orphans: 2                                # Min lines at page bottom, 1–5 (default: 2)
   widows: 2                                 # Min lines at page top, 1–5 (default: 2)
 

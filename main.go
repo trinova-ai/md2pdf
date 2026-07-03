@@ -81,6 +81,7 @@ type PageBreaksConfig struct {
 	BeforeH1 bool `yaml:"beforeH1"`
 	BeforeH2 bool `yaml:"beforeH2"`
 	BeforeH3 bool `yaml:"beforeH3"`
+	Duplex   bool `yaml:"duplex"` // blank verso after cover/TOC for double-sided printing
 	Orphans  int  `yaml:"orphans"`
 	Widows   int  `yaml:"widows"`
 }
@@ -514,6 +515,7 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 			BeforeH1: cfg.PageBreaks.BeforeH1,
 			BeforeH2: cfg.PageBreaks.BeforeH2,
 			BeforeH3: cfg.PageBreaks.BeforeH3,
+			Duplex:   cfg.PageBreaks.Duplex,
 			Orphans:  orDefaultInt(cfg.PageBreaks.Orphans, md2pdf.DefaultOrphans),
 			Widows:   orDefaultInt(cfg.PageBreaks.Widows, md2pdf.DefaultWidows),
 		}
