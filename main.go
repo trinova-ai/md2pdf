@@ -242,6 +242,15 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		inputPath = resolveInputPath(inputPath, cfg.Input.DefaultDir)
 	}
 
+	// Anchor a config-relative cover logo at the config file's directory and
+	// make it absolute: the rendered HTML lives in a temp dir, so a relative
+	// image path would not resolve at print time.
+	if l := cfg.Cover.Logo; l != "" && !strings.Contains(l, "://") && !strings.HasPrefix(l, "data:") && !filepath.IsAbs(l) {
+		if abs, err := filepath.Abs(filepath.Join(filepath.Dir(configPath), l)); err == nil {
+			cfg.Cover.Logo = abs
+		}
+	}
+
 	// Read markdown file
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
