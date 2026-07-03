@@ -22,4 +22,4 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 )
 
-replace github.com/alnah/picoloom/v2 => ./alnah:go-md2pdf
+replace github.com/alnah/picoloom/v2 => ./alnah:picoloom
