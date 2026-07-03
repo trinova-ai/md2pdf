@@ -40,8 +40,18 @@ type Config struct {
 	Watermark  WatermarkConfig  `yaml:"watermark"`
 	Footer     FooterConfig     `yaml:"footer"`
 	Assets     AssetsConfig     `yaml:"assets"`
+	Mermaid    MermaidConfig    `yaml:"mermaid"`
 	Style      string           `yaml:"style"`
 	Timeout    string           `yaml:"timeout"`
+}
+
+// MermaidConfig controls how ```mermaid fences are rendered.
+type MermaidConfig struct {
+	// Scale is the symbol size: CSS pixels per Mermaid layout unit.
+	// 1.0 (default) renders diagrams at Mermaid's natural size, giving
+	// symbols and text the same size in every diagram; <1 shrinks, >1
+	// enlarges. Wide diagrams still shrink to fit the page width.
+	Scale float64 `yaml:"scale"`
 }
 
 type DocumentConfig struct {
@@ -356,7 +366,11 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 	} else {
 		defer ws.Cleanup()
 	}
-	body, err = transform.NewPipeline(mermaid.NewTransformer()).Run(body, ws.Dir(), filepath.Dir(inputPath))
+	mt := mermaid.NewTransformer()
+	if cfg.Mermaid.Scale > 0 {
+		mt.Scale = cfg.Mermaid.Scale
+	}
+	body, err = transform.NewPipeline(mt).Run(body, ws.Dir(), filepath.Dir(inputPath))
 	if err != nil {
 		return fmt.Errorf("transforming: %w", err)
 	}
@@ -379,11 +393,26 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 	return nil
 }
 
+// diagramCSS guarantees generated diagrams behave in print regardless of the
+// selected style (or none): never wider than the text column — wide diagrams
+// shrink proportionally — and not sliced across a page boundary when they fit
+// on one page. Scoped to the pipeline's images via their fixed alt text.
+const diagramCSS = `
+/* Generated diagrams (transformer pipeline) */
+img[alt="diagram"] {
+  max-width: 100%;
+  height: auto;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+`
+
 // resolveStyleCSS loads the CSS for cfg.Style via the library's asset loader
-// (respects assets.basePath). An empty style name means no CSS.
+// (respects assets.basePath) and appends the diagram print rules. An empty
+// style name means only the diagram rules.
 func resolveStyleCSS(cfg *Config) (string, error) {
 	if cfg.Style == "" {
-		return "", nil
+		return diagramCSS, nil
 	}
 	loader, err := md2pdf.NewAssetLoader(cfg.Assets.BasePath)
 	if err != nil {
@@ -393,7 +422,7 @@ func resolveStyleCSS(cfg *Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("loading style %q: %w", cfg.Style, err)
 	}
-	return css, nil
+	return css + diagramCSS, nil
 }
 
 // converterOptions builds the md2pdf converter options from config.

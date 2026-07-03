@@ -207,4 +207,90 @@ func TestTransformRendersWithRealMMDC(t *testing.T) {
 	if !strings.Contains(string(data), "<svg") {
 		t.Errorf("rendered file does not look like an SVG (%d bytes)", len(data))
 	}
+	if strings.Contains(string(data), `width="100%"`) {
+		t.Errorf("rendered SVG still has width=\"100%%\"; intrinsic size was not pinned")
+	}
+}
+
+func TestSetExplicitSize(t *testing.T) {
+	t.Parallel()
+
+	mmdcRoot := `<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" class="flowchart" style="max-width: 204.5px; background-color: white;" viewBox="0 0 204.5 70"><g>body</g></svg>`
+
+	tests := []struct {
+		name            string
+		svg             string
+		scale           float64
+		wantContains    []string
+		wantNotContains []string
+		wantErr         bool
+	}{
+		{
+			name:  "pins width and height from viewBox at scale 1",
+			svg:   mmdcRoot,
+			scale: 1,
+			wantContains: []string{
+				`<svg width="204.5px" height="70px"`,
+				`viewBox="0 0 204.5 70"`,
+			},
+			wantNotContains: []string{`width="100%"`, `max-width:`},
+		},
+		{
+			name:  "scale multiplies dimensions",
+			svg:   mmdcRoot,
+			scale: 0.5,
+			wantContains: []string{
+				`width="102.25px"`,
+				`height="35px"`,
+			},
+		},
+		{
+			name:         "no viewBox returns svg unchanged",
+			svg:          `<svg width="100%"><g/></svg>`,
+			scale:        1,
+			wantContains: []string{`<svg width="100%">`},
+		},
+		{
+			name:  "only root tag is rewritten",
+			svg:   `<svg width="100%" viewBox="0 0 10 20"><svg width="100%" viewBox="0 0 1 1"/></svg>`,
+			scale: 1,
+			wantContains: []string{
+				`<svg width="10px" height="20px" viewBox="0 0 10 20">`,
+				`<svg width="100%" viewBox="0 0 1 1"/>`,
+			},
+		},
+		{
+			name:    "not an svg errors",
+			svg:     `<html>nope</html>`,
+			scale:   1,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := setExplicitSize([]byte(tt.svg), tt.scale)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("setExplicitSize() error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("setExplicitSize() error = %v, want nil", err)
+			}
+			for _, want := range tt.wantContains {
+				if !strings.Contains(string(got), want) {
+					t.Errorf("setExplicitSize() missing %q\nGot:\n%s", want, got)
+				}
+			}
+			for _, notWant := range tt.wantNotContains {
+				if strings.Contains(string(got), notWant) {
+					t.Errorf("setExplicitSize() should not contain %q\nGot:\n%s", notWant, got)
+				}
+			}
+		})
+	}
 }

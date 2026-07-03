@@ -149,6 +149,17 @@ page:
   margin: 0.5                               # Inches, 0.25–3.0 (default: 0.5)
 
 # ---------------------------------------------------------------------------
+# mermaid — Mermaid diagram rendering (```mermaid fences → SVG via mmdc)
+# ---------------------------------------------------------------------------
+mermaid:
+  scale: 1.0                                # Symbol size: CSS px per Mermaid unit.
+                                            # 1.0 = natural size (16px labels) — the
+                                            # same symbol/text size in every diagram.
+                                            # <1 shrinks (0.75 ≈ body text), >1
+                                            # enlarges. Wide diagrams always shrink
+                                            # to fit the page width.
+
+# ---------------------------------------------------------------------------
 # pageBreaks — Page break control
 # ---------------------------------------------------------------------------
 pageBreaks:

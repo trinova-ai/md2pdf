@@ -181,6 +181,12 @@ runs before conversion, with a disposable per-run workspace
   Homebrew bottle does not bundle one. Documents without mermaid fences never
   invoke `mmdc`.
 
+  Diagrams are embedded at their **natural size**, so symbols and label text
+  are the same size in every diagram regardless of its dimensions (wide
+  diagrams still shrink to fit the page width). Tune with `mermaid.scale` in
+  the config: `1.0` (default) = Mermaid's native 16px labels, `0.75` shrinks
+  symbols to roughly body-text size, values above 1 enlarge.
+
 ## Tasks
 
 This project uses [xc](https://github.com/joerdav/xc) as a task runner.

@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +27,13 @@ const installCmd = "npm install -g @mermaid-js/mermaid-cli"
 // code, mermaid fences nested inside other column-0 fences, and indented
 // fences all pass through untouched.
 type Transformer struct {
+	// Scale controls symbol size: CSS pixels per Mermaid layout unit.
+	// 1.0 renders diagrams at Mermaid's natural size (16px labels; CSS
+	// pixels print at 1/96 inch), so symbols and text are the same size in
+	// every diagram regardless of its dimensions. Values below 1 shrink
+	// symbols, above 1 enlarge them. Zero or negative means 1.0.
+	Scale float64
+
 	// render turns one diagram source file (input) into an SVG (output).
 	// It defaults to invoking mmdc; tests may replace it to exercise fence
 	// detection and replacement without the Mermaid CLI installed.
@@ -33,7 +42,17 @@ type Transformer struct {
 
 // NewTransformer returns a Transformer that renders diagrams with mmdc.
 func NewTransformer() *Transformer {
-	return &Transformer{render: renderWithMMDC}
+	t := &Transformer{Scale: 1}
+	t.render = t.renderWithMMDC
+	return t
+}
+
+// scale returns the effective scale factor, defaulting to 1.0.
+func (t *Transformer) scale() float64 {
+	if t.Scale > 0 {
+		return t.Scale
+	}
+	return 1
 }
 
 // Name returns the transformer's identifier for logging and errors.
@@ -126,8 +145,9 @@ func (t *Transformer) renderDiagram(workDir string, n int, body []string) (strin
 	return output, nil
 }
 
-// renderWithMMDC renders input to output using the Mermaid CLI.
-func renderWithMMDC(input, output string) error {
+// renderWithMMDC renders input to output using the Mermaid CLI, then pins the
+// SVG's intrinsic size so symbols keep a consistent scale in the PDF.
+func (t *Transformer) renderWithMMDC(input, output string) error {
 	mmdc, err := exec.LookPath("mmdc")
 	if err != nil {
 		return fmt.Errorf("mermaid CLI (mmdc) not found: install with `%s`", installCmd)
@@ -138,5 +158,70 @@ func renderWithMMDC(input, output string) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("mmdc: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
+	svg, err := os.ReadFile(output)
+	if err != nil {
+		return fmt.Errorf("read rendered svg: %w", err)
+	}
+	fixed, err := setExplicitSize(svg, t.scale())
+	if err != nil {
+		return fmt.Errorf("pin svg size: %w", err)
+	}
+	if err := os.WriteFile(output, fixed, 0o644); err != nil {
+		return fmt.Errorf("write resized svg: %w", err)
+	}
 	return nil
+}
+
+// svgRootPattern matches the opening root <svg …> tag.
+var svgRootPattern = regexp.MustCompile(`(?s)<svg\b[^>]*>`)
+
+// svgSizeAttrPatterns strip the attributes replaced by explicit sizing:
+// width/height and the inline max-width mmdc mirrors from the viewBox.
+var (
+	svgWidthAttrPattern  = regexp.MustCompile(`\s(?:width|height)="[^"]*"`)
+	svgMaxWidthPattern   = regexp.MustCompile(`max-width:\s*[^;"]*;?\s*`)
+	svgViewBoxPattern    = regexp.MustCompile(`viewBox="([^"]+)"`)
+	errSVGRootTagMissing = fmt.Errorf("no <svg> root tag")
+)
+
+// setExplicitSize rewrites the root <svg> tag with explicit pixel width and
+// height derived from its viewBox and the scale factor. mmdc emits
+// width="100%" with only a viewBox, so as an <img> the diagram has no
+// intrinsic size and stretches to the text column — symbol size then depends
+// on the diagram's width. Pinning the size makes symbols and text uniform
+// across diagrams; wide diagrams still shrink to fit through the page CSS's
+// img { max-width: 100% }. SVGs without a viewBox are returned unchanged.
+func setExplicitSize(svg []byte, scale float64) ([]byte, error) {
+	loc := svgRootPattern.FindIndex(svg)
+	if loc == nil {
+		return nil, errSVGRootTagMissing
+	}
+	root := string(svg[loc[0]:loc[1]])
+
+	vb := svgViewBoxPattern.FindStringSubmatch(root)
+	if vb == nil {
+		return svg, nil
+	}
+	fields := strings.Fields(vb[1])
+	if len(fields) != 4 {
+		return svg, nil
+	}
+	w, errW := strconv.ParseFloat(fields[2], 64)
+	h, errH := strconv.ParseFloat(fields[3], 64)
+	if errW != nil || errH != nil || w <= 0 || h <= 0 {
+		return svg, nil
+	}
+
+	root = svgWidthAttrPattern.ReplaceAllString(root, "")
+	root = svgMaxWidthPattern.ReplaceAllString(root, "")
+	size := fmt.Sprintf(`<svg width="%spx" height="%spx"`,
+		strconv.FormatFloat(w*scale, 'f', -1, 64),
+		strconv.FormatFloat(h*scale, 'f', -1, 64))
+	root = strings.Replace(root, "<svg", size, 1)
+
+	var out bytes.Buffer
+	out.Write(svg[:loc[0]])
+	out.WriteString(root)
+	out.Write(svg[loc[1]:])
+	return out.Bytes(), nil
 }
