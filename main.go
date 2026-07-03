@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,7 +136,7 @@ type AssetsConfig struct {
 func main() {
 	app := &cli.Command{
 		Name:    "md2pdf",
-		Usage:   "Convert a Markdown file to PDF",
+		Usage:   "Convert Markdown files to PDF",
 		Version: Version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -146,14 +147,14 @@ func main() {
 			&cli.StringFlag{
 				Name:    "output",
 				Aliases: []string{"o"},
-				Usage:   "output PDF `FILE` (default: input with .pdf extension)",
+				Usage:   "output PDF `FILE`; output directory when the input is a directory (default: input with .pdf extension)",
 			},
 			&cli.BoolFlag{
 				Name:  "keep-workspace",
 				Usage: "keep the transformer workspace directory and print its path (for debugging)",
 			},
 		},
-		ArgsUsage: "<input.md | config.yaml>",
+		ArgsUsage: "<input.md | input-dir | config.yaml>",
 		Action:    run,
 		Commands: []*cli.Command{
 			{
@@ -256,7 +257,66 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Read markdown file
+	// Resolve style CSS and build the converter once. Both derive only from
+	// config-level fields (style, assets, timeout) that frontmatter never
+	// overrides, so they are safely shared by every file in batch mode.
+	css, err := resolveStyleCSS(cfg)
+	if err != nil {
+		return err
+	}
+	opts, err := converterOptions(cfg)
+	if err != nil {
+		return err
+	}
+	conv, err := md2pdf.NewConverter(opts...)
+	if err != nil {
+		return fmt.Errorf("initializing converter: %w", err)
+	}
+	defer conv.Close()
+
+	// A directory as input selects batch mode: every *.md directly inside it
+	// (non-recursive) becomes its own PDF in the output directory. A stat
+	// error is deliberately ignored here — the single-file path below reports
+	// the missing input as "reading input".
+	if info, err := os.Stat(inputPath); err == nil && info.IsDir() {
+		files, err := listMarkdownFiles(inputPath)
+		if err != nil {
+			return err
+		}
+		outDir := batchOutputDir(cmd.String("output"), cfg.Output.DefaultDir, inputPath)
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			return fmt.Errorf("creating output directory: %w", err)
+		}
+		return convertBatch(files, outDir, func(in, out string) error {
+			return convertFile(ctx, cmd, conv, css, *cfg, in, out)
+		}, os.Stderr)
+	}
+
+	// Single file: resolve the output path.
+	outPath := cmd.String("output")
+	if outPath == "" {
+		if cfg.Output.DefaultDir != "" {
+			outPath = filepath.Join(cfg.Output.DefaultDir, pdfBaseName(inputPath))
+		} else {
+			outPath = filepath.Join(filepath.Dir(inputPath), pdfBaseName(inputPath))
+		}
+	}
+	if dir := filepath.Dir(outPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("creating output directory: %w", err)
+		}
+	}
+
+	return convertFile(ctx, cmd, conv, css, *cfg, inputPath, outPath)
+}
+
+// convertFile converts one markdown file to one PDF: read, frontmatter
+// overlay, transformer pipeline, conversion, write. It receives cfg BY VALUE
+// so the frontmatter overlay of one file never leaks into the next file of a
+// batch. Config contains a single slice field (Signature.Links); the shallow
+// copy shares its backing array, which is safe because applyFrontmatter never
+// mutates Links.
+func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, css string, cfg Config, inputPath, outPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
@@ -264,7 +324,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	// Extract frontmatter and body; frontmatter overrides config
 	body, fm := extractFrontmatter(string(data))
-	applyFrontmatter(fm, cfg)
+	applyFrontmatter(fm, &cfg)
 
 	// Run the transformer pipeline over the body in a disposable workspace.
 	// The pipeline is empty for now; concrete transformers (Mermaid, …)
@@ -289,58 +349,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		cfg.Document.Date = time.Now().Format("2 January 2006")
 	}
 
-	// Resolve output path
-	outPath := cmd.String("output")
-	if outPath == "" {
-		base := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath)) + ".pdf"
-		if cfg.Output.DefaultDir != "" {
-			outPath = filepath.Join(cfg.Output.DefaultDir, base)
-		} else {
-			outPath = filepath.Join(filepath.Dir(inputPath), base)
-		}
-	}
-	if dir := filepath.Dir(outPath); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("creating output directory: %w", err)
-		}
-	}
-
-	// Resolve CSS from style name via the asset loader (respects assets.basePath)
-	var css string
-	if cfg.Style != "" {
-		loader, loaderErr := md2pdf.NewAssetLoader(cfg.Assets.BasePath)
-		if loaderErr != nil {
-			return fmt.Errorf("initializing asset loader: %w", loaderErr)
-		}
-		css, err = loader.LoadStyle(cfg.Style)
-		if err != nil {
-			return fmt.Errorf("loading style %q: %w", cfg.Style, err)
-		}
-	}
-
-	// Build converter options from config
-	var opts []md2pdf.Option
-	if cfg.Assets.BasePath != "" {
-		opts = append(opts, md2pdf.WithAssetPath(cfg.Assets.BasePath))
-	}
-	if cfg.Timeout != "" {
-		d, err := time.ParseDuration(cfg.Timeout)
-		if err != nil {
-			return fmt.Errorf("parsing timeout %q: %w", cfg.Timeout, err)
-		}
-		if d <= 0 {
-			return fmt.Errorf("timeout must be positive: %q", cfg.Timeout)
-		}
-		opts = append(opts, md2pdf.WithTimeout(d))
-	}
-
-	conv, err := md2pdf.NewConverter(opts...)
-	if err != nil {
-		return fmt.Errorf("initializing converter: %w", err)
-	}
-	defer conv.Close()
-
-	result, err := conv.Convert(ctx, buildInput(body, inputPath, css, cfg))
+	result, err := conv.Convert(ctx, buildInput(body, inputPath, css, &cfg))
 	if err != nil {
 		return fmt.Errorf("converting: %w", err)
 	}
@@ -351,6 +360,101 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Created %s\n", outPath)
 	return nil
+}
+
+// resolveStyleCSS loads the CSS for cfg.Style via the library's asset loader
+// (respects assets.basePath). An empty style name means no CSS.
+func resolveStyleCSS(cfg *Config) (string, error) {
+	if cfg.Style == "" {
+		return "", nil
+	}
+	loader, err := md2pdf.NewAssetLoader(cfg.Assets.BasePath)
+	if err != nil {
+		return "", fmt.Errorf("initializing asset loader: %w", err)
+	}
+	css, err := loader.LoadStyle(cfg.Style)
+	if err != nil {
+		return "", fmt.Errorf("loading style %q: %w", cfg.Style, err)
+	}
+	return css, nil
+}
+
+// converterOptions builds the md2pdf converter options from config.
+func converterOptions(cfg *Config) ([]md2pdf.Option, error) {
+	var opts []md2pdf.Option
+	if cfg.Assets.BasePath != "" {
+		opts = append(opts, md2pdf.WithAssetPath(cfg.Assets.BasePath))
+	}
+	if cfg.Timeout != "" {
+		d, err := time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			return nil, fmt.Errorf("parsing timeout %q: %w", cfg.Timeout, err)
+		}
+		if d <= 0 {
+			return nil, fmt.Errorf("timeout must be positive: %q", cfg.Timeout)
+		}
+		opts = append(opts, md2pdf.WithTimeout(d))
+	}
+	return opts, nil
+}
+
+// pdfBaseName returns the input's basename with its extension replaced by .pdf.
+func pdfBaseName(inputPath string) string {
+	return strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath)) + ".pdf"
+}
+
+// listMarkdownFiles returns the paths of the *.md files directly inside dir
+// (non-recursive), in the sorted order os.ReadDir guarantees. A directory
+// without a single .md file is an error: batch mode would have nothing to do.
+func listMarkdownFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("reading input directory: %w", err)
+	}
+	var files []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".md") {
+			continue
+		}
+		files = append(files, filepath.Join(dir, e.Name()))
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no .md files in %s", dir)
+	}
+	return files, nil
+}
+
+// batchOutputDir resolves the output directory for batch mode along the
+// data-priority chain: -o flag → output.defaultDir from config → the input
+// directory itself.
+func batchOutputDir(flagOutput, cfgDefaultDir, inputDir string) string {
+	if flagOutput != "" {
+		return flagOutput
+	}
+	if cfgDefaultDir != "" {
+		return cfgDefaultDir
+	}
+	return inputDir
+}
+
+// convertBatch converts every file to <outDir>/<basename>.pdf via convert,
+// continuing past per-file failures. Failures are printed to errW at the end,
+// one "file: error" line each, and folded into a single summary error so the
+// process exits non-zero when any file failed.
+func convertBatch(files []string, outDir string, convert func(inputPath, outPath string) error, errW io.Writer) error {
+	var failures []string
+	for _, f := range files {
+		if err := convert(f, filepath.Join(outDir, pdfBaseName(f))); err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", f, err))
+		}
+	}
+	if len(failures) == 0 {
+		return nil
+	}
+	for _, f := range failures {
+		fmt.Fprintln(errW, f)
+	}
+	return fmt.Errorf("%d of %d files failed", len(failures), len(files))
 }
 
 // isYAMLPath reports whether the path looks like a YAML config file.

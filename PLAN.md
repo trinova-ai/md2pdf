@@ -175,11 +175,11 @@ Close the gaps between what `run()` does and what the README/config promise.
 
 #### G2.1.1: Accept a directory as input
 
-- [ ] When the input argument is a directory, convert every `*.md` in it
+- [x] When the input argument is a directory, convert every `*.md` in it
       (non-recursive), each to its own PDF; `-o` names the output directory.
-- [ ] Continue on per-file errors, report them at the end, exit non-zero if
+- [x] Continue on per-file errors, report them at the end, exit non-zero if
       any file failed.
-- [ ] Tests: mixed directory (md + other files), empty directory, one bad file
+- [x] Tests: mixed directory (md + other files), empty directory, one bad file
       among good ones.
 
 ### G2.2: Frontmatter gaps
