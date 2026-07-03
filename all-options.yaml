@@ -49,6 +49,10 @@ author:
 # input — Input source options
 # ---------------------------------------------------------------------------
 input:
+  file: ""                                  # Markdown input for config-only runs
+                                            # (md2pdf <this-file>.yaml). Relative to
+                                            # this file's directory. Empty = implicit:
+                                            # <this-file's basename>.md alongside it.
   defaultDir: "./docs"                      # Default input directory (empty = must specify)
 
 # ---------------------------------------------------------------------------

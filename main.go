@@ -62,6 +62,7 @@ type AuthorConfig struct {
 }
 
 type InputConfig struct {
+	File       string `yaml:"file"` // markdown input for config-only runs (relative to the config file)
 	DefaultDir string `yaml:"defaultDir"`
 }
 
@@ -146,7 +147,7 @@ func main() {
 				Usage:   "output PDF `FILE` (default: input with .pdf extension)",
 			},
 		},
-		ArgsUsage: "<input.md>",
+		ArgsUsage: "<input.md | config.yaml>",
 		Action:    run,
 		Commands: []*cli.Command{
 			{
@@ -198,14 +199,26 @@ func runInit(ctx context.Context, cmd *cli.Command) error {
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	if cmd.NArg() == 0 {
+	configPath := cmd.String("config")
+	inputPath := cmd.Args().First()
+
+	// A lone YAML argument is a config that names its own input: explicitly
+	// via input.file, or implicitly as <config-basename>.md next to it.
+	if isYAMLPath(inputPath) {
+		if configPath != "" {
+			return fmt.Errorf("config given twice: -c %s and %s", configPath, inputPath)
+		}
+		configPath = inputPath
+		inputPath = ""
+	}
+
+	if inputPath == "" && configPath == "" {
 		return cli.ShowAppHelp(cmd)
 	}
-	inputPath := cmd.Args().First()
 
 	// Load base config from YAML file
 	cfg := &Config{}
-	if configPath := cmd.String("config"); configPath != "" {
+	if configPath != "" {
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return fmt.Errorf("reading config: %w", err)
@@ -215,9 +228,18 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Resolve input path: if not found as given and input.defaultDir is set,
-	// try joining with defaultDir before giving up.
-	inputPath = resolveInputPath(inputPath, cfg.Input.DefaultDir)
+	if inputPath == "" {
+		// Config-only invocation: the config names the input.
+		var err error
+		inputPath, err = inputFromConfig(configPath, cfg)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Resolve input path: if not found as given and input.defaultDir is set,
+		// try joining with defaultDir before giving up.
+		inputPath = resolveInputPath(inputPath, cfg.Input.DefaultDir)
+	}
 
 	// Read markdown file
 	data, err := os.ReadFile(inputPath)
@@ -296,6 +318,30 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Created %s\n", outPath)
 	return nil
+}
+
+// isYAMLPath reports whether the path looks like a YAML config file.
+func isYAMLPath(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".yaml" || ext == ".yml"
+}
+
+// inputFromConfig resolves the markdown input for a config-only invocation:
+// input.file (relative paths are anchored at the config file's directory),
+// or implicitly the config's own basename with a .md extension.
+func inputFromConfig(configPath string, cfg *Config) (string, error) {
+	dir := filepath.Dir(configPath)
+	if f := cfg.Input.File; f != "" {
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(dir, f)
+		}
+		return f, nil
+	}
+	implied := filepath.Join(dir, strings.TrimSuffix(filepath.Base(configPath), filepath.Ext(configPath))+".md")
+	if _, err := os.Stat(implied); err != nil {
+		return "", fmt.Errorf("no input: %s sets no input.file and %s does not exist", configPath, implied)
+	}
+	return implied, nil
 }
 
 // resolveInputPath tries the path as given first; if that file is missing and

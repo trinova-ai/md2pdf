@@ -34,6 +34,8 @@ Implemented, in a single ~500-line `main.go`:
   incl. `DisableNumbering` via `toc.numbered: false`, Footer, Signature,
   Watermark, PageBreaks, Page); style CSS resolved through the library's asset
   loader. Single file in, single PDF out; `-o` overrides the output path.
+  Config-only invocation: `md2pdf <config>.yaml` resolves the input from
+  `input.file` or implicitly `<config-basename>.md` beside the config.
 - **Library** — vendored at `alnah:picoloom`, upstream v2.1.2 plus a
   local patch stack (ADR-001).
 
