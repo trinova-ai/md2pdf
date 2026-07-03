@@ -3,7 +3,7 @@ module github.com/trinova/md2pdf
 go 1.25.4
 
 require (
-	github.com/alnah/go-md2pdf v0.0.0
+	github.com/alnah/picoloom/v2 v2.1.2
 	github.com/urfave/cli/v3 v3.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -19,7 +19,7 @@ require (
 	github.com/ysmood/leakless v0.9.0 // indirect
 	github.com/yuin/goldmark v1.7.13 // indirect
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc // indirect
-	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 )
 
-replace github.com/alnah/go-md2pdf => ./alnah:go-md2pdf
+replace github.com/alnah/picoloom/v2 => ./alnah:go-md2pdf

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	md2pdf "github.com/alnah/go-md2pdf"
+	md2pdf "github.com/alnah/picoloom/v2"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
