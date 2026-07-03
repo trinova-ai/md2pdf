@@ -55,6 +55,7 @@ carry a patch stack of local commits on the vendored copy, rebased onto
 2. `feat: embed PDF document outline from headings`
 3. `feat: add TOC.DisableNumbering to list headings verbatim`
 4. `fix: no blank page after cover/TOC when BeforeH1 is set`
+5. `feat: duplex option keeps cover and TOC on their own sheet`
 
 Sync procedure: in `alnah:picoloom/` run `git fetch origin && git rebase
 origin/main`, resolve conflicts (most likely `internal/pipeline/tocinject.go`),
