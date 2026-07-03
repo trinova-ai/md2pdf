@@ -29,7 +29,8 @@ Implemented, in a single ~500-line `main.go`:
 - **Frontmatter** — `extractFrontmatter()` parses a `---` block of **dotted
   keys** (ADR-002); `applyFrontmatter()` overlays them on config.
   `date: auto` resolves to today. Covered: all `document.*` and `author.*`
-  fields. Not covered: `watermark`, validation of field lengths.
+  fields plus `watermark.text`; known values are validated (string type,
+  500-character cap).
 - **Orchestration** — `buildInput()` maps config → `md2pdf.Input` (Cover, TOC
   incl. `DisableNumbering` via `toc.numbered: false`, Footer, Signature,
   Watermark, PageBreaks, Page); style CSS resolved through the library's asset
@@ -39,10 +40,12 @@ Implemented, in a single ~500-line `main.go`:
 - **Library** — vendored at `alnah:picoloom`, upstream v2.1.2 plus a
   local patch stack (ADR-001).
 
-Not implemented: transformer pipeline, temp workspace, Mermaid rendering,
-batch/directory input, `watermark` frontmatter, frontmatter validation,
-`examples/`. The manual workaround for diagrams is visible in `testdata/`:
-a hand-rendered SVG referenced from the markdown.
+All phases delivered (P1–P3): transformer pipeline and temp workspace
+(`transform/`), Mermaid rendering registered in `run()` (` ```mermaid ` fences
+→ SVG via `mmdc`, required at runtime), batch/directory input, `watermark.text`
+frontmatter, frontmatter validation, and `examples/`. `testdata/mermaid-sample.md`
+proves the mermaid path end-to-end; the hand-rendered SVG workaround in
+`testdata/` is a historical artifact, no longer needed.
 
 ### ADR-001: Vendored fork with a patch stack
 
@@ -160,10 +163,10 @@ listings.
 
 #### G1.2.2: Register and prove end-to-end
 
-- [ ] Register the mermaid transformer in `run()`'s pipeline.
-- [ ] Add `testdata/mermaid-sample.md` with a small diagram; convert it and
+- [x] Register the mermaid transformer in `run()`'s pipeline.
+- [x] Add `testdata/mermaid-sample.md` with a small diagram; convert it and
       verify the PDF embeds a rendered SVG (not a code listing).
-- [ ] Re-render the CrunchGate `diagram.md` as a real-world check.
+- [x] Re-render the CrunchGate `diagram.md` as a real-world check.
 
 ## Phase P2: CLI completeness
 

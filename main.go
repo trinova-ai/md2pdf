@@ -15,6 +15,7 @@ import (
 
 	md2pdf "github.com/alnah/picoloom/v2"
 	"github.com/trinova/md2pdf/transform"
+	"github.com/trinova/md2pdf/transform/mermaid"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -343,9 +344,9 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 	applyFrontmatter(fm, &cfg)
 
 	// Run the transformer pipeline over the body in a disposable workspace.
-	// The pipeline is empty for now; concrete transformers (Mermaid, …)
-	// register here as they land. Generated files must be referenced by
-	// absolute path, since Input.SourceDir stays at the source directory.
+	// Registered transformers: mermaid (```mermaid fences → SVG via mmdc).
+	// Generated files must be referenced by absolute path, since
+	// Input.SourceDir stays at the source directory.
 	ws, err := transform.NewWorkspace()
 	if err != nil {
 		return fmt.Errorf("creating workspace: %w", err)
@@ -355,7 +356,7 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 	} else {
 		defer ws.Cleanup()
 	}
-	body, err = transform.NewPipeline().Run(body, ws.Dir(), filepath.Dir(inputPath))
+	body, err = transform.NewPipeline(mermaid.NewTransformer()).Run(body, ws.Dir(), filepath.Dir(inputPath))
 	if err != nil {
 		return fmt.Errorf("transforming: %w", err)
 	}

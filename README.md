@@ -138,8 +138,8 @@ duplicated between the two. From the repository root:
 md2pdf -c examples/company-config.yaml examples/report.md   # → examples/report.pdf
 ```
 
-The report includes a ` ```mermaid ` fence; it renders as a code listing until
-the Mermaid transformer is registered (see [Transformers](#transformers)).
+The report includes a ` ```mermaid ` fence; it renders as a diagram, which
+requires the Mermaid CLI at runtime (see [Transformers](#transformers)).
 
 ## Vendored library (ADR-001)
 
@@ -171,10 +171,15 @@ automatically.
 
 The `transform` package provides a sequential markdown-rewriting pipeline that
 runs before conversion, with a disposable per-run workspace
-(`--keep-workspace` preserves it for debugging). A Mermaid transformer exists
-(`transform/mermaid`, renders ` ```mermaid ` fences to SVG via `mmdc`) but is
-**not yet registered** in the pipeline — the pipeline currently runs empty, so
-Mermaid blocks still render as code listings.
+(`--keep-workspace` preserves it for debugging). Registered transformers:
+
+- **Mermaid** (`transform/mermaid`) — ` ```mermaid ` fences are rendered to
+  SVG and embedded as diagrams in the PDF. Requires the Mermaid CLI (`mmdc`)
+  at runtime: `brew install mermaid-cli` (or
+  `npm install -g @mermaid-js/mermaid-cli`). If `mmdc` errors about a missing
+  browser, run `npx puppeteer browsers install chrome-headless-shell` — the
+  Homebrew bottle does not bundle one. Documents without mermaid fences never
+  invoke `mmdc`.
 
 ## Tasks
 
