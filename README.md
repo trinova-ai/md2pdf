@@ -125,6 +125,22 @@ Rules:
 In batch mode each file's frontmatter overrides the shared config for that
 file only.
 
+## Examples
+
+`examples/` holds a working pair demonstrating the config/frontmatter split:
+[`company-config.yaml`](examples/company-config.yaml) carries the org-wide
+defaults (author, style, cover, TOC, footer, page setup) and
+[`report.md`](examples/report.md) carries the per-document metadata in its
+frontmatter (title, version, `watermark.text: "DRAFT"`) — no metadata is
+duplicated between the two. From the repository root:
+
+```sh
+md2pdf -c examples/company-config.yaml examples/report.md   # → examples/report.pdf
+```
+
+The report includes a ` ```mermaid ` fence; it renders as a code listing until
+the Mermaid transformer is registered (see [Transformers](#transformers)).
+
 ## Vendored library (ADR-001)
 
 Upstream renamed to picoloom (module `github.com/alnah/picoloom/v2`). This

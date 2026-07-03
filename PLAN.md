@@ -227,8 +227,8 @@ The two decisions the README must tell truthfully:
 
 #### G3.1.2: Examples directory
 
-- [ ] Add `examples/company-config.yaml` (org defaults) and
+- [x] Add `examples/company-config.yaml` (org defaults) and
       `examples/report.md` (frontmatter + a mermaid block), internally
       consistent — no duplicated metadata.
-- [ ] Verify the README walkthrough works from scratch:
+- [x] Verify the README walkthrough works from scratch:
       `md2pdf -c examples/company-config.yaml examples/report.md`.

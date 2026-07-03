@@ -1,0 +1,48 @@
+# =============================================================================
+# examples/company-config.yaml — org-wide defaults, shared across documents
+# =============================================================================
+#
+# This config carries only what every document of the organization has in
+# common: author, style, cover, TOC, footer, page setup. Per-document metadata
+# (document.title, document.version, watermark.text, …) does NOT belong here —
+# each document sets it in its own frontmatter (see examples/report.md), so
+# nothing is duplicated between the two files.
+#
+#   md2pdf -c examples/company-config.yaml examples/report.md
+#
+# Because this config is shared, it sets no input.file. A per-document config
+# could set `input.file: report.md` and be invoked on its own as
+# `md2pdf that-config.yaml`.
+
+author:
+  name: "Sarah Chen"
+  title: "Senior Security Engineer"
+  organization: "Ironclad Security Consulting"
+  email: "sarah.chen@ironclad-sec.io"
+
+style: "corporate"
+
+timeout: "60s"
+
+cover:
+  enabled: true
+  # logo: "./assets/logo.png"   # relative paths resolve against this file's directory
+
+toc:
+  enabled: true
+  title: "Contents"
+  numbered: true                # false = list headings verbatim (when they carry their own numbers)
+
+footer:
+  enabled: true
+  position: "right"
+  showPageNumber: true
+
+page:
+  size: "a4"
+  orientation: "portrait"
+
+pageBreaks:
+  enabled: true
+  beforeH1: true
+  duplex: false                 # true = blank verso after cover/TOC for double-sided printing
