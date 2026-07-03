@@ -125,9 +125,9 @@ a no-op so this lands without behavior change.
 
 #### G1.1.2: Temp workspace
 
-- [ ] Add `transform/workspace.go`: `NewWorkspace()` wrapping `os.MkdirTemp`,
+- [x] Add `transform/workspace.go`: `NewWorkspace()` wrapping `os.MkdirTemp`,
       with `Dir()` and `Cleanup()` (idempotent, usable via `defer`).
-- [ ] Tests: directory exists and is writable; `Cleanup()` removes it;
+- [x] Tests: directory exists and is writable; `Cleanup()` removes it;
       double-`Cleanup()` is safe.
 
 #### G1.1.3: Wire the pipeline into run()
