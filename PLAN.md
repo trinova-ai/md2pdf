@@ -149,13 +149,13 @@ listings.
 
 #### G1.2.1: Render mermaid blocks to SVG
 
-- [ ] Add `transform/mermaid/mermaid.go` implementing `Transformer`: find
+- [x] Add `transform/mermaid/mermaid.go` implementing `Transformer`: find
       ` ```mermaid ` fences, write each body to the workspace, render with
       `mmdc` to `mermaid-<n>.svg`, replace the fence with
       `![diagram](<absolute path>)`.
-- [ ] Missing `mmdc` → clear error naming the install command
+- [x] Missing `mmdc` → clear error naming the install command
       (`npm install -g @mermaid-js/mermaid-cli`); non-mermaid fences untouched.
-- [ ] Tests (skip when `mmdc` absent): one block, three blocks with sequential
+- [x] Tests (skip when `mmdc` absent): one block, three blocks with sequential
       names, zero blocks pass-through, ` ```go ` fence untouched.
 
 #### G1.2.2: Register and prove end-to-end
