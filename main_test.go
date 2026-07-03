@@ -152,6 +152,52 @@ func TestConvertBatchContinuesOnError(t *testing.T) {
 	}
 }
 
+// TestApplyFrontmatterWatermark: watermark.text sets the text AND enables the
+// watermark on a config that leaves it off; an absent or empty key must not
+// enable it.
+func TestApplyFrontmatterWatermark(t *testing.T) {
+	t.Run("watermark.text enables and sets", func(t *testing.T) {
+		var cfg Config
+		applyFrontmatter(map[string]string{"watermark.text": "DRAFT"}, &cfg)
+		if !cfg.Watermark.Enabled {
+			t.Error("Watermark.Enabled = false, want true")
+		}
+		if cfg.Watermark.Text != "DRAFT" {
+			t.Errorf("Watermark.Text = %q, want %q", cfg.Watermark.Text, "DRAFT")
+		}
+	})
+
+	t.Run("absent key leaves watermark disabled", func(t *testing.T) {
+		var cfg Config
+		applyFrontmatter(map[string]string{"document.title": "T"}, &cfg)
+		if cfg.Watermark.Enabled {
+			t.Error("Watermark.Enabled = true, want false")
+		}
+		if cfg.Watermark.Text != "" {
+			t.Errorf("Watermark.Text = %q, want empty", cfg.Watermark.Text)
+		}
+	})
+
+	t.Run("empty value leaves watermark disabled", func(t *testing.T) {
+		var cfg Config
+		applyFrontmatter(map[string]string{"watermark.text": ""}, &cfg)
+		if cfg.Watermark.Enabled {
+			t.Error("Watermark.Enabled = true, want false")
+		}
+	})
+
+	t.Run("overrides configured text", func(t *testing.T) {
+		cfg := Config{Watermark: WatermarkConfig{Enabled: true, Text: "CONFIDENTIAL"}}
+		applyFrontmatter(map[string]string{"watermark.text": "DRAFT"}, &cfg)
+		if cfg.Watermark.Text != "DRAFT" {
+			t.Errorf("Watermark.Text = %q, want %q", cfg.Watermark.Text, "DRAFT")
+		}
+		if !cfg.Watermark.Enabled {
+			t.Error("Watermark.Enabled = false, want true")
+		}
+	})
+}
+
 // TestConvertBatchAllFail: every failure is reported and counted.
 func TestConvertBatchAllFail(t *testing.T) {
 	files := []string{"x.md", "y.md"}

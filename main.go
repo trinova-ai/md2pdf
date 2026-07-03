@@ -552,6 +552,14 @@ func applyFrontmatter(fm map[string]string, cfg *Config) {
 	override("author.phone", &cfg.Author.Phone)
 	override("author.address", &cfg.Author.Address)
 	override("author.department", &cfg.Author.Department)
+
+	// watermark.text both sets the text and enables the watermark, so a
+	// document can declare itself DRAFT even when the config leaves the
+	// watermark off. An empty value is ignored like any other override.
+	if v, ok := fm["watermark.text"]; ok && v != "" {
+		cfg.Watermark.Text = v
+		cfg.Watermark.Enabled = true
+	}
 }
 
 // buildInput constructs md2pdf.Input from the resolved config.

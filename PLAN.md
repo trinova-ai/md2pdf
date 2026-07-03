@@ -190,10 +190,10 @@ Follows the dotted-key convention:
 
 ![[#ADR-002: Dotted frontmatter keys]]
 
-- [ ] Support `watermark.text`: sets `Watermark.Text` and enables the
+- [x] Support `watermark.text`: sets `Watermark.Text` and enables the
       watermark even when the config leaves it off.
-- [ ] Document the key in `all-options.yaml`'s frontmatter notes.
-- [ ] Test: `watermark.text: DRAFT` in frontmatter produces a watermarked PDF
+- [x] Document the key in `all-options.yaml`'s frontmatter notes.
+- [x] Test: `watermark.text: DRAFT` in frontmatter produces a watermarked PDF
       with a watermark-free config.
 
 #### G2.2.2: Frontmatter validation
