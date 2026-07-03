@@ -95,6 +95,7 @@ type TOCConfig struct {
 	Title    string `yaml:"title"`
 	MinDepth int    `yaml:"minDepth"`
 	MaxDepth int    `yaml:"maxDepth"`
+	Numbered *bool  `yaml:"numbered"` // nil/true = auto-number entries; false = list headings verbatim
 }
 
 type SignatureConfig struct {
@@ -406,9 +407,10 @@ func buildInput(body, inputPath, css string, cfg *Config) md2pdf.Input {
 			maxDepth = md2pdf.DefaultTOCMaxDepth
 		}
 		input.TOC = &md2pdf.TOC{
-			Title:    cfg.TOC.Title,
-			MinDepth: cfg.TOC.MinDepth,
-			MaxDepth: maxDepth,
+			Title:            cfg.TOC.Title,
+			MinDepth:         cfg.TOC.MinDepth,
+			MaxDepth:         maxDepth,
+			DisableNumbering: cfg.TOC.Numbered != nil && !*cfg.TOC.Numbered,
 		}
 	}
 

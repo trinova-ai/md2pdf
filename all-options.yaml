@@ -89,6 +89,10 @@ toc:
   title: "Contents"                         # Empty = no title above TOC
   minDepth: 2                               # 1–6 (default: 2, skips H1 document title)
   maxDepth: 3                               # 1–6 (default: 3); must be >= minDepth
+  numbered: true                            # false = list headings verbatim, without
+                                            #         auto-numbering (default: true).
+                                            # Use false when headings carry their own
+                                            # numbers (e.g. "## 3. Design").
 
 # ---------------------------------------------------------------------------
 # footer — Page footer options
