@@ -439,8 +439,8 @@ Published tags are immutable: never re-point one, always mint the next
 - [x] Rewrite README Installation (`go install …@latest`) and Vendored
       library (tagged fork, release script, `dev` branch, go.work loop);
       update ADR-001; no `--recurse-submodules` anywhere.
-- [ ] Tag md2pdf `v0.1.0` and push it — `@latest` must not resolve to the
+- [x] Tag md2pdf `v0.1.0` and push it — `@latest` must not resolve to the
       ancient `v0.0.1`.
-- [ ] Prove it: from a pristine `GOMODCACHE`,
+- [x] Prove it: from a pristine `GOMODCACHE`,
       `go install github.com/trinova-ai/md2pdf@latest` and the binary
       reports `v0.1.0`.
