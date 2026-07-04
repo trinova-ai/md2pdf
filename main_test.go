@@ -488,3 +488,39 @@ func TestConvertDiagramsEndToEnd(t *testing.T) {
 		t.Errorf("output suspiciously small: %d bytes; two rendered diagrams expected", len(data))
 	}
 }
+
+// TestConvertBatchEndToEnd is the real-render counterpart to the
+// fake-convert batch unit tests: a directory of two small markdown files
+// through the actual CLI, each producing its own PDF in the -o directory.
+func TestConvertBatchEndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("full PDF render is slow; skipping in -short mode")
+	}
+
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+	docs := map[string]string{
+		"alpha.md": "# Alpha\n\nFirst of two batch documents.\n",
+		"beta.md":  "# Beta\n\nSecond of two batch documents.\n",
+	}
+	for name, content := range docs {
+		if err := os.WriteFile(filepath.Join(inDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	args := []string{"md2pdf", "-o", outDir, inDir}
+	if err := newApp().Run(context.Background(), args); err != nil {
+		t.Fatalf("batch convert: %v", err)
+	}
+
+	for _, name := range []string{"alpha.pdf", "beta.pdf"} {
+		data, err := os.ReadFile(filepath.Join(outDir, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		if !bytes.HasPrefix(data, []byte("%PDF-")) {
+			t.Errorf("%s does not start with %%PDF-", name)
+		}
+	}
+}

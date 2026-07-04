@@ -393,7 +393,7 @@ corporate/custom, page orientation/size variants, and `--keep-workspace`.
 
 #### G5.1.4: Batch conversion end to end
 
-- [ ] Test: a temp directory holding two small generated markdown files,
+- [x] Test: a temp directory holding two small generated markdown files,
       converted through the real CLI (directory input, `-o` out-dir),
       produces two PDFs — the real-render counterpart to the fake-convert
       batch unit tests.
