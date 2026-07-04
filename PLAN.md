@@ -1,10 +1,12 @@
 # trinova/md2pdf — wrapper CLI over the vendored picoloom library
 
 A thin CLI (`main.go`, module `github.com/trinova-ai/md2pdf`) that turns Markdown
-into styled PDFs using the vendored [picoloom](https://github.com/alnah/picoloom)
-library (`./picoloom`, a git submodule). The plan is fully executed: the tool
-(P1–P3), publication under `trinova-ai` with a clean lint (P4; upstreaming
-the patches was dropped — see ADR-001), and feature-matrix e2e fixtures (P5).
+into styled PDFs using a tagged fork of the
+[picoloom](https://github.com/alnah/picoloom) library
+(`github.com/trinova-ai/picoloom/v2`; `./picoloom` is the untracked dev
+checkout — ADR-001). Delivered so far: the tool (P1–P3), publication under
+`trinova-ai` with a clean lint (P4), feature-matrix e2e fixtures (P5), and
+the tagged-fork dependency that makes `go install …@latest` work (P6).
 New work gets a new phase.
 
 Rules for every task:
@@ -38,8 +40,9 @@ Implemented, in a single ~500-line `main.go`:
   loader. Single file in, single PDF out; `-o` overrides the output path.
   Config-only invocation: `md2pdf <config>.yaml` resolves the input from
   `input.file` or implicitly `<config-basename>.md` beside the config.
-- **Library** — vendored at `picoloom` (git submodule), upstream v2.1.2 plus
-  a local patch stack (ADR-001).
+- **Library** — tagged fork dependency `github.com/trinova-ai/picoloom/v2`
+  (upstream v2.1.2 plus the patch stack; `./picoloom` is the untracked dev
+  checkout — ADR-001).
 
 All phases delivered (P1–P3): transformer pipeline and temp workspace
 (`transform/`), Mermaid rendering registered in `run()` (` ```mermaid ` fences
@@ -53,15 +56,17 @@ is converted for real by `TestConvertReportEndToEnd`;
 
 The original premise — "use upstream untouched, never fork" — is retired.
 Upstream renamed to picoloom (repo `alnah/picoloom`, module
-`github.com/alnah/picoloom/v2`); we carry a patch stack on the vendored copy
-at `./picoloom`, a git submodule of the public fork `trinova-ai/picoloom`
-pinned to branch `trinova`.
+`github.com/alnah/picoloom/v2`); we carry a patch stack on the public fork
+`trinova-ai/picoloom` and depend on it as a normal tagged module,
+`github.com/trinova-ai/picoloom/v2 vX.Y.Z-trinova.N` (upstream base X.Y.Z,
+cut N). No `replace`, no submodule — so `go install
+github.com/trinova-ai/md2pdf@latest` works (P6, 2026-07-05; supersedes the
+submodule scheme of 2026-07-04).
 
-Triangular layout (decided 2026-07-04): remote `upstream` = `alnah/picoloom`,
-fetch-only; remote `origin` = `trinova-ai/picoloom`. Branch `main` mirrors
-upstream and only fast-forwards; the patch stack lives on branch `trinova`,
-kept checked out so the wrapper's `replace` directive builds against it
-(`git log main..trinova` there is authoritative):
+Triangular layout: remote `upstream` = `alnah/picoloom`, fetch-only; remote
+`origin` = `trinova-ai/picoloom`. Branch `main` mirrors upstream,
+fast-forward only. Branch `trinova` = the patch stack, kept pure and
+upstream-shaped (`git log main..trinova` is authoritative):
 
 1. `fix: keep pre-numbered headings from double numbering in TOC`
 2. `feat: embed PDF document outline from headings`
@@ -69,19 +74,31 @@ kept checked out so the wrapper's `replace` directive builds against it
 4. `fix: no blank page after cover/TOC when BeforeH1 is set`
 5. `feat: duplex option keeps cover and TOC on their own sheet`
 
+Releases: `scripts/release-picoloom.sh <tag>` stamps a *generated* commit on
+a detached head above `trinova` renaming the module path to
+`github.com/trinova-ai/picoloom/v2` (go.mod + self-imports), tags it, pushes
+the tag, regenerates local branch `dev` (= `trinova` + rename), and bumps
+the wrapper's go.mod. The rename never lives on `trinova` — the stack stays
+PR-able and the rename cannot conflict, being re-stamped per release.
+Published tags are immutable: the Go checksum DB records them permanently —
+never re-point one, mint the next `-trinova.N`.
+
 Sync procedure, in `picoloom/`:
 
 ```sh
 git fetch upstream
 git checkout main    && git merge --ff-only upstream/main && git push origin main
 git checkout trinova && git rebase main && git push --force-with-lease origin trinova
-cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack tip
+cd .. && scripts/release-picoloom.sh v2.X.Y-trinova.N   # then commit the go.mod bump
 ```
 
-Conflicts land most often in `internal/pipeline/tocinject.go`; run the fork's
-tests, then rebuild the wrapper. Decided 2026-07-05: the patches will NOT be
-upstreamed as PRs — the stack is a permanent feature branch, carried forward
-by the sync procedure above.
+Conflicts land most often in `internal/pipeline/tocinject.go`. Dev loop: the
+untracked `./picoloom` checkout rests on `dev`; a personal untracked
+`go.work` (`use .` + `use ./picoloom`) makes wrapper builds pick up local
+library edits, while `GOWORK=off` builds against the pinned tag (what users
+get). Decided 2026-07-05: the patches will NOT be upstreamed as PRs — the
+stack is a permanent feature branch, carried forward by the sync procedure
+above.
 
 ### ADR-002: Dotted frontmatter keys
 
@@ -399,7 +416,7 @@ Published tags are immutable: never re-point one, always mint the next
 
 #### G6.1.1: Fork release machinery and first tag
 
-- [ ] Add `scripts/release-picoloom.sh <tag> [fork-dir]`: from a clean fork
+- [x] Add `scripts/release-picoloom.sh <tag> [fork-dir]`: from a clean fork
       tree — detach from `trinova`, `go mod edit -module` + rewrite
       self-imports, `GOWORK=off` build+test, commit, tag, push the tag,
       reset `dev` to the release commit and rest there; then `go get` the
@@ -419,7 +436,7 @@ Published tags are immutable: never re-point one, always mint the next
 
 #### G6.1.3: Docs, v0.1.0, end-to-end install proof
 
-- [ ] Rewrite README Installation (`go install …@latest`) and Vendored
+- [x] Rewrite README Installation (`go install …@latest`) and Vendored
       library (tagged fork, release script, `dev` branch, go.work loop);
       update ADR-001; no `--recurse-submodules` anywhere.
 - [ ] Tag md2pdf `v0.1.0` and push it — `@latest` must not resolve to the

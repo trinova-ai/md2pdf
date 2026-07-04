@@ -1,7 +1,7 @@
 # md2pdf
 
 Convert Markdown to styled PDFs from the command line. A thin Go CLI
-(`github.com/trinova-ai/md2pdf`) around a vendored fork of
+(`github.com/trinova-ai/md2pdf`) around a tagged fork of
 [picoloom](https://github.com/alnah/picoloom), which renders through headless
 Chrome (Chromium is auto-downloaded by the library on first run).
 
@@ -18,19 +18,15 @@ Chrome (Chromium is auto-downloaded by the library on first run).
 
 ## Installation
 
-`go install github.com/trinova-ai/md2pdf@latest` does **not** work: the
-picoloom dependency is wired in via a `replace` directive, which `go install`
-rejects for remote modules. Install from a clone with the submodule:
-
 ```sh
-git clone --recurse-submodules https://github.com/trinova-ai/md2pdf
-cd md2pdf
-go install .
+go install github.com/trinova-ai/md2pdf@latest
 ```
 
-The picoloom dependency is satisfied by the `replace` directive in `go.mod`,
-which points at the `./picoloom` git submodule (see
-[Vendored library](#vendored-library-adr-001)). Requires Go 1.25+.
+Requires Go 1.25+. The picoloom dependency is a regular tagged module
+(`github.com/trinova-ai/picoloom/v2`, see
+[Vendored library](#vendored-library-adr-001)) — no submodules, no `replace`
+directives. From a checkout, `go install .` works too (`xc install` for a
+tag-stamped binary).
 
 ## Usage
 
@@ -156,17 +152,16 @@ requires the Mermaid CLI at runtime (see [Transformers](#transformers)).
 ## Vendored library (ADR-001)
 
 Upstream renamed to picoloom (repo [alnah/picoloom](https://github.com/alnah/picoloom),
-module `github.com/alnah/picoloom/v2`). This repository vendors the public
-fork [trinova-ai/picoloom](https://github.com/trinova-ai/picoloom) as a git
-submodule at `./picoloom` (pinned to branch `trinova`), wired in via a
-`replace` directive in `go.mod`.
+module `github.com/alnah/picoloom/v2`). md2pdf depends on the public fork
+[trinova-ai/picoloom](https://github.com/trinova-ai/picoloom) as a normal
+tagged module: `github.com/trinova-ai/picoloom/v2 vX.Y.Z-trinova.N`, where
+`X.Y.Z` is the upstream base and `N` counts our cuts on it.
 
 The fork uses a triangular workflow: remote `upstream` (`alnah/picoloom`) is
 fetch-only, remote `origin` (`trinova-ai/picoloom`) receives everything.
-Branch `main` mirrors upstream and only fast-forwards; the patch stack lives
-on branch `trinova`, kept checked out so the `replace` directive builds
-against it (`git log main..trinova` in that directory is authoritative —
-currently 5 commits):
+Branch `main` mirrors upstream and only fast-forwards. Branch `trinova` is
+the patch stack, kept pure and upstream-shaped (`git log main..trinova` is
+authoritative — currently 5 commits):
 
 1. fix: keep pre-numbered headings from double numbering in TOC
 2. feat: embed PDF document outline from headings
@@ -174,17 +169,31 @@ currently 5 commits):
 4. fix: no blank page after cover/TOC when BeforeH1 is set
 5. feat: duplex option keeps cover and TOC on their own sheet
 
-Sync procedure:
+Releases: `scripts/release-picoloom.sh <tag>` stamps a **generated** commit
+on a detached head above `trinova` that renames the module path to
+`github.com/trinova-ai/picoloom/v2` (go.mod plus self-imports), tags it,
+pushes the tag, regenerates the local `dev` branch (= `trinova` + rename),
+and bumps `go.mod` here. Because the rename never lives on `trinova`, the
+stack stays PR-able and the rename can never conflict — it is re-stamped
+fresh at every release. **Published tags are immutable**: the Go checksum
+database records them permanently, so never re-point one; mint the next
+`-trinova.N` instead.
+
+Sync with upstream (in the fork checkout, then release):
 
 ```sh
-cd picoloom
 git fetch upstream
 git checkout main    && git merge --ff-only upstream/main && git push origin main
 git checkout trinova && git rebase main && git push --force-with-lease origin trinova
 go test ./...                                # conflicts land most often in internal/pipeline/tocinject.go
-cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack tip
-go install .                                 # rebuild the wrapper
+cd .. && scripts/release-picoloom.sh v2.X.Y-trinova.N   # then commit the go.mod bump
 ```
+
+Dev loop: keep an untracked checkout at `./picoloom` resting on `dev` and a
+personal (never committed) `go.work` with `use .` and `use ./picoloom` —
+builds then pick up local library edits instantly. `GOWORK=off` opts out and
+builds against the pinned tag, i.e. exactly what users get; the release
+script and any release verification use it.
 
 The patch stack is a permanent feature branch: it is not upstreamed, and the
 sync procedure above carries it forward across upstream releases.
