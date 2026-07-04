@@ -1,10 +1,11 @@
 # trinova/md2pdf — wrapper CLI over the vendored picoloom library
 
 A thin CLI (`main.go`, module `github.com/trinova/md2pdf`) that turns Markdown
-into styled PDFs using the vendored [picoloom](https://github.com/alnah/go-md2pdf)
-library (`./alnah:picoloom`). Config + frontmatter + library orchestration are
-done; this plan covers what remains: the transformer pipeline (Mermaid → SVG),
-batch mode, frontmatter gaps, and honest docs.
+into styled PDFs using the vendored [picoloom](https://github.com/alnah/picoloom)
+library (`./alnah:picoloom`). The tool itself is done — config, frontmatter,
+transformer pipeline (Mermaid → SVG), batch mode, docs (P1–P3). What remains
+is publication (P4): remotes and backup, upstreaming the library patches, and
+a clean lint.
 
 Rules for every task:
 
@@ -50,9 +51,15 @@ proves the mermaid path end-to-end; the hand-rendered SVG workaround in
 ### ADR-001: Vendored fork with a patch stack
 
 The original premise — "use upstream untouched, never fork" — is retired.
-Upstream renamed to `picoloom` (module `github.com/alnah/picoloom/v2`) and we
-carry a patch stack of local commits on the vendored copy, rebased onto
-`origin/main` (`git log origin/main..main` there is authoritative):
+Upstream renamed to picoloom (repo `alnah/picoloom`, module
+`github.com/alnah/picoloom/v2`); we carry a patch stack on the vendored copy
+at `./alnah:picoloom`, a clone of the public fork `trinova-ai/picoloom`.
+
+Triangular layout (decided 2026-07-04): remote `upstream` = `alnah/picoloom`,
+fetch-only; remote `origin` = `trinova-ai/picoloom`. Branch `main` mirrors
+upstream and only fast-forwards; the patch stack lives on branch `trinova`,
+kept checked out so the wrapper's `replace` directive builds against it
+(`git log main..trinova` there is authoritative):
 
 1. `fix: keep pre-numbered headings from double numbering in TOC`
 2. `feat: embed PDF document outline from headings`
@@ -60,10 +67,18 @@ carry a patch stack of local commits on the vendored copy, rebased onto
 4. `fix: no blank page after cover/TOC when BeforeH1 is set`
 5. `feat: duplex option keeps cover and TOC on their own sheet`
 
-Sync procedure: in `alnah:picoloom/` run `git fetch origin && git rebase
-origin/main`, resolve conflicts (most likely `internal/pipeline/tocinject.go`),
-run its tests, then rebuild the wrapper. Long-term exit: upstream these commits
-as PRs; rebase then drops them automatically.
+Sync procedure, in `alnah:picoloom/`:
+
+```sh
+git fetch upstream
+git checkout main    && git merge --ff-only upstream/main && git push origin main
+git checkout trinova && git rebase main && git push --force-with-lease origin trinova
+```
+
+Conflicts land most often in `internal/pipeline/tocinject.go`; run the fork's
+tests, then rebuild the wrapper. Long-term exit: upstream the commits as PRs
+cut per-patch from `main` (Phase P4, G4.2); each merge makes the next rebase
+drop that patch automatically.
 
 ### ADR-002: Dotted frontmatter keys
 
@@ -235,3 +250,91 @@ The two decisions the README must tell truthfully:
       consistent — no duplicated metadata.
 - [x] Verify the README walkthrough works from scratch:
       `md2pdf -c examples/company-config.yaml examples/report.md`.
+
+## Phase P4: Publication
+
+Everything shipped so far exists only on this machine. This phase backs the
+work up, puts the library patches on a path back upstream, and gets the linter
+to zero. Two related loose ends live outside this repo and are deliberately
+not tasks here: the CrunchGate vault's uncommitted method doc + `md2pdf.yaml`,
+and the out-of-sync `plugins/trinova` copy of the method doc.
+
+### G4.1: Remotes and backup
+
+The wrapper repo (~26 commits) has no remote. The vendored fork's only remote
+is upstream `alnah/picoloom` (still fetched via its old `go-md2pdf` URL),
+which is not writable, so its 5-commit patch stack is machine-local too. `go.mod` wires the fork in via
+`replace … => ./alnah:picoloom`, and that directory is untracked by the
+wrapper repo — a fresh clone of the wrapper alone does not build.
+
+Decided 2026-07-04: both repos live under the `trinova-ai` GitHub org (the
+org René owns). The module path `github.com/trinova/md2pdf` predates this and
+gets renamed along the way.
+
+![[#ADR-001: Vendored fork with a patch stack]]
+
+#### G4.1.1: Push the picoloom fork
+
+Set up the triangular workflow from ADR-001: fork, rewire remotes, split the
+patch stack onto `trinova`, push.
+
+- [ ] Fork upstream into the org: `gh repo fork alnah/picoloom --org
+      trinova-ai` — a real GitHub fork (public by construction) so upstream
+      PRs can come from it.
+- [ ] Rewire remotes in `alnah:picoloom/`: rename `origin` → `upstream`,
+      re-point it at `git@github.com:alnah/picoloom.git` (drop the
+      `go-md2pdf` redirect), disable its push URL; add `origin` =
+      `git@github.com:trinova-ai/picoloom.git`.
+- [ ] Branch split: create `trinova` at the current 5-patch tip and check it
+      out; reset `main` to `upstream/main`; run one full ADR-001 sync cycle.
+- [ ] Push `main` and `trinova` to `origin` with `-u`; fork and wrapper
+      builds/tests green.
+- [ ] Update the README's Vendored library section (repo link, remote/branch
+      layout, sync procedure) to match ADR-001.
+
+#### G4.1.2: Push the wrapper repo
+
+- [ ] Create `github.com/trinova-ai/md2pdf` (visibility: René's call at
+      creation time) and rename the module from `github.com/trinova/md2pdf`
+      to `github.com/trinova-ai/md2pdf` — go.mod, the `transform` import in
+      `main.go`, and the README install instructions.
+- [ ] Decide how a clone obtains `alnah:picoloom` — git submodule pinned to
+      the patch stack, README bootstrap instructions, or dropping `replace`
+      in favor of the pushed fork's module path — and implement it (update
+      the README's Vendored library section to match).
+- [ ] Tidy the working tree first: ignore or remove the `md2pdf` binary,
+      `.DS_Store`, and `solworktext:md2pdf/` (unrelated reference checkout);
+      decide whether `testdata/trust-anchor-strategy.*` and `work.yaml` are
+      fixtures worth tracking or scratch to drop.
+- [ ] Create the remote, push `master`, set upstream; verify a fresh clone
+      builds and converts `examples/report.md` per the README walkthrough.
+
+### G4.2: Upstream the patch stack
+
+The long-term exit from ADR-001: every merged PR is one patch the next rebase
+drops automatically.
+
+![[#ADR-001: Vendored fork with a patch stack]]
+
+#### G4.2.1: Open upstream PRs for the five patches
+
+- [ ] In `alnah:picoloom/`, run the ADR-001 sync procedure (`git fetch origin
+      && git rebase origin/main`), keep its tests green.
+- [ ] For each of the five commits, open a PR against `alnah/picoloom` from a
+      per-patch branch cut from the fork's `main` — one coherent changeset
+      per PR, describing the wrapper's use case in each. Patches 1/3 (TOC)
+      and 4/5 (blank page/duplex) overlap in `tocinject.go`: open those in
+      dependency order or as two small stacked series.
+- [ ] Record the PR URLs in ADR-001; after any merge, re-run the sync
+      procedure and confirm the stack shrinks.
+
+### G4.3: Lint zero
+
+#### G4.3.1: Fix errcheck findings
+
+- [ ] Handle the unchecked `defer ws.Cleanup()` returns (in `run()` in
+      `main.go`, and in `transform/workspace_test.go`) — check the error or
+      discard it explicitly with a rationale.
+- [ ] Lint the wrapper to zero findings, keep `go build ./...` and
+      `go test ./...` green, then `go install .` and smoke-test per the plan
+      rules.
