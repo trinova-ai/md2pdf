@@ -2,7 +2,7 @@
 
 Convert Markdown to styled PDFs from the command line. A thin Go CLI
 (`github.com/trinova/md2pdf`) around a vendored fork of
-[picoloom](https://github.com/alnah/go-md2pdf), which renders through headless
+[picoloom](https://github.com/alnah/picoloom), which renders through headless
 Chrome (Chromium is auto-downloaded by the library on first run).
 
 - Cover page, table of contents (auto-numbered, or verbatim with
@@ -146,11 +146,17 @@ requires the Mermaid CLI at runtime (see [Transformers](#transformers)).
 
 ## Vendored library (ADR-001)
 
-Upstream renamed to picoloom (module `github.com/alnah/picoloom/v2`). This
-repository vendors a fork at `./alnah:picoloom`, wired in via a `replace`
-directive in `go.mod`, and carries a local patch stack rebased onto upstream's
-`origin/main` (`git log origin/main..main` in that directory is authoritative
-— currently 5 commits):
+Upstream renamed to picoloom (repo [alnah/picoloom](https://github.com/alnah/picoloom),
+module `github.com/alnah/picoloom/v2`). This repository vendors the public
+fork [trinova-ai/picoloom](https://github.com/trinova-ai/picoloom) at
+`./alnah:picoloom`, wired in via a `replace` directive in `go.mod`.
+
+The fork uses a triangular workflow: remote `upstream` (`alnah/picoloom`) is
+fetch-only, remote `origin` (`trinova-ai/picoloom`) receives everything.
+Branch `main` mirrors upstream and only fast-forwards; the patch stack lives
+on branch `trinova`, kept checked out so the `replace` directive builds
+against it (`git log main..trinova` in that directory is authoritative —
+currently 5 commits):
 
 1. fix: keep pre-numbered headings from double numbering in TOC
 2. feat: embed PDF document outline from headings
@@ -162,13 +168,15 @@ Sync procedure:
 
 ```sh
 cd alnah:picoloom
-git fetch origin && git rebase origin/main   # conflicts most likely in internal/pipeline/tocinject.go
-go test ./...
+git fetch upstream
+git checkout main    && git merge --ff-only upstream/main && git push origin main
+git checkout trinova && git rebase main && git push --force-with-lease origin trinova
+go test ./...                                # conflicts land most often in internal/pipeline/tocinject.go
 cd .. && go install .                        # rebuild the wrapper
 ```
 
-Long-term exit: upstream these commits as PRs; the rebase then drops them
-automatically.
+Long-term exit: upstream these commits as PRs cut per-patch from `main`; each
+merge makes the next rebase drop that patch automatically.
 
 ## Transformers
 

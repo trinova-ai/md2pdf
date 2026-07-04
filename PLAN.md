@@ -278,18 +278,18 @@ gets renamed along the way.
 Set up the triangular workflow from ADR-001: fork, rewire remotes, split the
 patch stack onto `trinova`, push.
 
-- [ ] Fork upstream into the org: `gh repo fork alnah/picoloom --org
+- [x] Fork upstream into the org: `gh repo fork alnah/picoloom --org
       trinova-ai` — a real GitHub fork (public by construction) so upstream
       PRs can come from it.
-- [ ] Rewire remotes in `alnah:picoloom/`: rename `origin` → `upstream`,
+- [x] Rewire remotes in `alnah:picoloom/`: rename `origin` → `upstream`,
       re-point it at `git@github.com:alnah/picoloom.git` (drop the
       `go-md2pdf` redirect), disable its push URL; add `origin` =
       `git@github.com:trinova-ai/picoloom.git`.
-- [ ] Branch split: create `trinova` at the current 5-patch tip and check it
+- [x] Branch split: create `trinova` at the current 5-patch tip and check it
       out; reset `main` to `upstream/main`; run one full ADR-001 sync cycle.
-- [ ] Push `main` and `trinova` to `origin` with `-u`; fork and wrapper
+- [x] Push `main` and `trinova` to `origin` with `-u`; fork and wrapper
       builds/tests green.
-- [ ] Update the README's Vendored library section (repo link, remote/branch
+- [x] Update the README's Vendored library section (repo link, remote/branch
       layout, sync procedure) to match ADR-001.
 
 #### G4.1.2: Push the wrapper repo
