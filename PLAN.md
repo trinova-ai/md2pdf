@@ -44,9 +44,10 @@ Implemented, in a single ~500-line `main.go`:
 All phases delivered (P1–P3): transformer pipeline and temp workspace
 (`transform/`), Mermaid rendering registered in `run()` (` ```mermaid ` fences
 → SVG via `mmdc`, required at runtime), batch/directory input, `watermark.text`
-frontmatter, frontmatter validation, and `examples/`. `testdata/mermaid-sample.md`
-proves the mermaid path end-to-end; the hand-rendered SVG workaround in
-`testdata/` is a historical artifact, no longer needed.
+frontmatter, and frontmatter validation. The example pair lives in `testdata/`
+(company-config.yaml + report.md, moved from the retired `examples/` dir) and
+is converted for real by `TestConvertReportEndToEnd`;
+`testdata/mermaid-sample.md` proves the mermaid path in isolation.
 
 ### ADR-001: Vendored fork with a patch stack
 

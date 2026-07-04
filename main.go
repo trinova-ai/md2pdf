@@ -148,7 +148,15 @@ type AssetsConfig struct {
 }
 
 func main() {
-	app := &cli.Command{
+	app := newApp()
+	if err := app.Run(context.Background(), os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "md2pdf: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func newApp() *cli.Command {
+	return &cli.Command{
 		Name:    "md2pdf",
 		Usage:   "Convert Markdown files to PDF",
 		Version: Version,
@@ -193,11 +201,6 @@ func main() {
 				Action: runInit,
 			},
 		},
-	}
-
-	if err := app.Run(context.Background(), os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "md2pdf: %v\n", err)
-		os.Exit(1)
 	}
 }
 

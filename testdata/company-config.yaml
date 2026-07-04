@@ -1,14 +1,17 @@
 # =============================================================================
-# examples/company-config.yaml — org-wide defaults, shared across documents
+# testdata/company-config.yaml — org-wide defaults, shared across documents
 # =============================================================================
 #
 # This config carries only what every document of the organization has in
 # common: author, style, cover, TOC, footer, page setup. Per-document metadata
 # (document.title, document.version, watermark.text, …) does NOT belong here —
-# each document sets it in its own frontmatter (see examples/report.md), so
+# each document sets it in its own frontmatter (see testdata/report.md), so
 # nothing is duplicated between the two files.
 #
-#   md2pdf -c examples/company-config.yaml examples/report.md
+#   md2pdf -c testdata/company-config.yaml testdata/report.md
+#
+# This pair doubles as the end-to-end test fixture: TestConvertReportEndToEnd
+# in main_test.go converts report.md with this config.
 #
 # Because this config is shared, it sets no input.file. A per-document config
 # could set `input.file: report.md` and be invoked on its own as

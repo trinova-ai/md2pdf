@@ -131,16 +131,20 @@ file only.
 
 ## Examples
 
-`examples/` holds a working pair demonstrating the config/frontmatter split:
-[`company-config.yaml`](examples/company-config.yaml) carries the org-wide
+`testdata/` holds a working pair demonstrating the config/frontmatter split:
+[`company-config.yaml`](testdata/company-config.yaml) carries the org-wide
 defaults (author, style, cover, TOC, footer, page setup) and
-[`report.md`](examples/report.md) carries the per-document metadata in its
+[`report.md`](testdata/report.md) carries the per-document metadata in its
 frontmatter (title, version, `watermark.text: "DRAFT"`) — no metadata is
 duplicated between the two. From the repository root:
 
 ```sh
-md2pdf -c examples/company-config.yaml examples/report.md   # → examples/report.pdf
+md2pdf -c testdata/company-config.yaml testdata/report.md   # → testdata/report.pdf
 ```
+
+The same pair is the end-to-end test fixture: `go test` converts it for real
+(`TestConvertReportEndToEnd`; skipped under `-short` or when `mmdc` is
+missing).
 
 The report includes a ` ```mermaid ` fence; it renders as a diagram, which
 requires the Mermaid CLI at runtime (see [Transformers](#transformers)).

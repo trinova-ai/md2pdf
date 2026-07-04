@@ -35,8 +35,8 @@ sequenceDiagram
     G-->>C: 200 Response
 ```
 
-*Note: the block above renders as a code listing for now; once the Mermaid
-transformer is registered in the pipeline it will render as a diagram.*
+*The block above is rendered to SVG by the Mermaid transformer and embedded
+as a diagram (requires `mmdc` at runtime).*
 
 ## Findings
 

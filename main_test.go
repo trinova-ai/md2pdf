@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -397,5 +399,36 @@ func TestConvertBatchAllFail(t *testing.T) {
 		if !strings.Contains(stderr.String(), line) {
 			t.Errorf("stderr %q missing %q", stderr.String(), line)
 		}
+	}
+}
+
+// TestConvertReportEndToEnd drives the real CLI over the testdata pair:
+// company-config.yaml (org defaults: cover, TOC, footer) + report.md
+// (frontmatter metadata, DRAFT watermark, a mermaid diagram). It exercises
+// the full pipeline — config, frontmatter overlay, mermaid transform,
+// headless-Chrome render.
+func TestConvertReportEndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("full PDF render is slow; skipping in -short mode")
+	}
+	if _, err := exec.LookPath("mmdc"); err != nil {
+		t.Skip("mmdc not installed; skipping end-to-end conversion test")
+	}
+
+	outPath := filepath.Join(t.TempDir(), "report.pdf")
+	args := []string{"md2pdf", "-c", "testdata/company-config.yaml", "-o", outPath, "testdata/report.md"}
+	if err := newApp().Run(context.Background(), args); err != nil {
+		t.Fatalf("convert testdata/report.md: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Errorf("output does not start with %%PDF- (got %q)", data[:min(8, len(data))])
+	}
+	if len(data) < 10_000 {
+		t.Errorf("output suspiciously small: %d bytes; cover, TOC, and a rendered diagram expected", len(data))
 	}
 }
