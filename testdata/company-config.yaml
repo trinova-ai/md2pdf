@@ -29,7 +29,7 @@ timeout: "60s"
 
 cover:
   enabled: true
-  # logo: "./assets/logo.png"   # relative paths resolve against this file's directory
+  logo: "./trinova-mark.svg"    # relative paths resolve against this file's directory
 
 toc:
   enabled: true

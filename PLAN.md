@@ -363,9 +363,9 @@ corporate/custom, page orientation/size variants, and `--keep-workspace`.
 
 #### G5.1.1: Cover logo in the walkthrough pair
 
-- [ ] Vendor `testdata/trinova-mark.svg` from
+- [x] Vendor `testdata/trinova-mark.svg` from
       https://trinovalabs.ai/assets/trinova-mark.svg.
-- [ ] Enable `cover.logo: "./trinova-mark.svg"` in
+- [x] Enable `cover.logo: "./trinova-mark.svg"` in
       `testdata/company-config.yaml` so `TestConvertReportEndToEnd` also
       covers config-relative logo resolution; suite green.
 
