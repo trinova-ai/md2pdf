@@ -1,0 +1,7 @@
+.DS_Store
+
+# Build artifact (go build .)
+/md2pdf
+
+# Generated output
+*.pdf
