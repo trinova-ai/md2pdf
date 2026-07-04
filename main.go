@@ -368,7 +368,12 @@ func convertFile(ctx context.Context, cmd *cli.Command, conv *md2pdf.Converter, 
 	if cmd.Bool("keep-workspace") {
 		fmt.Fprintf(os.Stderr, "md2pdf: keeping workspace %s\n", ws.Dir())
 	} else {
-		defer ws.Cleanup()
+		// A cleanup failure must not fail the conversion; report it and move on.
+		defer func() {
+			if err := ws.Cleanup(); err != nil {
+				fmt.Fprintf(os.Stderr, "md2pdf: cleaning workspace: %v\n", err)
+			}
+		}()
 	}
 	mt := mermaid.NewTransformer()
 	if cfg.Mermaid.Scale > 0 {

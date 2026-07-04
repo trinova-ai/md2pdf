@@ -321,10 +321,10 @@ patch stack onto `trinova`, push.
 
 #### G4.3.1: Fix errcheck findings
 
-- [ ] Handle the unchecked `defer ws.Cleanup()` returns (in `run()` in
+- [x] Handle the unchecked `defer ws.Cleanup()` returns (in `run()` in
       `main.go`, and in `transform/workspace_test.go`) — check the error or
       discard it explicitly with a rationale.
-- [ ] Lint the wrapper to zero findings, keep `go build ./...` and
+- [x] Lint the wrapper to zero findings, keep `go build ./...` and
       `go test ./...` green, then `go install .` and smoke-test per the plan
       rules.
 

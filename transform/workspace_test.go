@@ -13,7 +13,11 @@ func TestNewWorkspaceCreatesWritableDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorkspace() error = %v, want nil", err)
 	}
-	defer ws.Cleanup()
+	defer func() {
+		if err := ws.Cleanup(); err != nil {
+			t.Errorf("Cleanup() error = %v, want nil", err)
+		}
+	}()
 
 	info, err := os.Stat(ws.Dir())
 	if err != nil {
