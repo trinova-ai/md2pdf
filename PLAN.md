@@ -344,3 +344,52 @@ drops automatically.
 - [ ] Lint the wrapper to zero findings, keep `go build ./...` and
       `go test ./...` green, then `go install .` and smoke-test per the plan
       rules.
+
+## Phase P5: Test fixtures
+
+Fixture-driven end-to-end coverage of the feature matrix. Everything here is
+synthetic or explicitly cleared for the public repo (`trinova-mark.svg` —
+cleared by René 2026-07-04). A real-world representative document (deep
+heading hierarchy, pre-numbered headings, big tables, several diagrams) is
+still wanted; René is looking for one — when it lands, add a task here to
+fixture it. E2E tests follow the `TestConvertReportEndToEnd` conventions:
+skip under `-short`, skip mermaid-dependent ones without `mmdc`.
+
+### G5.1: Feature-matrix fixtures
+
+Each task adds a fixture pair plus the test that converts it for real. After
+these land, the untested config surface shrinks to: styles other than
+corporate/custom, page orientation/size variants, and `--keep-workspace`.
+
+#### G5.1.1: Cover logo in the walkthrough pair
+
+- [ ] Vendor `testdata/trinova-mark.svg` from
+      https://trinovalabs.ai/assets/trinova-mark.svg.
+- [ ] Enable `cover.logo: "./trinova-mark.svg"` in
+      `testdata/company-config.yaml` so `TestConvertReportEndToEnd` also
+      covers config-relative logo resolution; suite green.
+
+#### G5.1.2: Formal-report pair — verbatim TOC, duplex, signature, custom CSS
+
+- [ ] Add `testdata/formal.yaml` (`input.file: formal.md`,
+      `toc.numbered: false`, `pageBreaks.duplex: true`,
+      `signature.enabled: true`, `style: ./formal.css`),
+      `testdata/formal.md` (pre-numbered `## N.` headings, a table), and a
+      small `testdata/formal.css`.
+- [ ] Test: config-only invocation (`md2pdf testdata/formal.yaml`) produces a
+      PDF — this also exercises the `input.file` resolution path.
+
+#### G5.1.3: Mermaid width-and-scale fixture
+
+- [ ] Add `testdata/diagrams.md`: one wide and one narrow diagram plus a bare
+      numeric `mermaid.scale` in its frontmatter (the numeric-key path, end
+      to end).
+- [ ] Test: converting it with the walkthrough config produces a PDF; skipped
+      without `mmdc`.
+
+#### G5.1.4: Batch conversion end to end
+
+- [ ] Test: a temp directory holding two small generated markdown files,
+      converted through the real CLI (directory input, `-o` out-dir),
+      produces two PDFs — the real-render counterpart to the fake-convert
+      batch unit tests.
