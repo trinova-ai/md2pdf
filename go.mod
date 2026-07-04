@@ -3,7 +3,7 @@ module github.com/trinova-ai/md2pdf
 go 1.25.4
 
 require (
-	github.com/alnah/picoloom/v2 v2.1.2
+	github.com/trinova-ai/picoloom/v2 v2.1.2-trinova.1
 	github.com/urfave/cli/v3 v3.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -21,5 +21,3 @@ require (
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc // indirect
 	golang.org/x/net v0.55.0 // indirect
 )
-
-replace github.com/alnah/picoloom/v2 => ./picoloom

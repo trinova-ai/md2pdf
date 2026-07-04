@@ -408,13 +408,13 @@ Published tags are immutable: never re-point one, always mint the next
 
 #### G6.1.2: Require the tag; remove the submodule
 
-- [ ] Swap the root import and `go.mod` to
+- [x] Swap the root import and `go.mod` to
       `github.com/trinova-ai/picoloom/v2 v2.1.2-trinova.1`; drop the
       `replace` and the alnah require.
-- [ ] De-submodule: remove the `picoloom` gitlink and `.gitmodules`, clean
+- [x] De-submodule: remove the `picoloom` gitlink and `.gitmodules`, clean
       the submodule config; ignore `/picoloom/`, `go.work`, `go.work.sum`;
       write the untracked `go.work`.
-- [ ] Both build modes green: `GOWORK=off go test ./...` (pinned tag) and
+- [x] Both build modes green: `GOWORK=off go test ./...` (pinned tag) and
       workspace `go test ./...` (dev loop).
 
 #### G6.1.3: Docs, v0.1.0, end-to-end install proof

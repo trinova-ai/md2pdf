@@ -5,3 +5,10 @@
 
 # Generated output
 *.pdf
+
+# Local picoloom fork checkout (dev loop; releases come from its tags)
+/picoloom/
+
+# Personal workspace files, never committed
+go.work
+go.work.sum

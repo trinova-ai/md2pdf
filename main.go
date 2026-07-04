@@ -15,7 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	md2pdf "github.com/alnah/picoloom/v2"
+	md2pdf "github.com/trinova-ai/picoloom/v2"
 	"github.com/trinova-ai/md2pdf/transform"
 	"github.com/trinova-ai/md2pdf/transform/mermaid"
 	"github.com/urfave/cli/v3"
