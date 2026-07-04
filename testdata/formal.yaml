@@ -1,0 +1,58 @@
+# =============================================================================
+# testdata/formal.yaml — config-only invocation fixture
+# =============================================================================
+#
+# Invoked as a lone argument (no -c):
+#
+#   md2pdf testdata/formal.yaml        # from the repository root
+#
+# input.file resolves relative to this file. Exercised for real by
+# TestConvertFormalConfigOnly in main_test.go. This fixture covers the parts
+# of the feature matrix the walkthrough pair does not: verbatim TOC
+# (toc.numbered: false with pre-numbered headings), duplex page breaks, the
+# signature block, and a custom style via assets.basePath.
+
+input:
+  file: "formal.md"
+
+author:
+  name: "Alex Fontaine"
+  title: "Managing Director"
+  organization: "Meridian Advisory Group"
+  email: "alex.fontaine@meridian-advisory.example"
+
+# Custom styles are loaded as <basePath>/styles/<name>.css. Note that
+# basePath is resolved against the working directory, not this file —
+# run from the repository root.
+style: "formal"
+assets:
+  basePath: "testdata"
+
+cover:
+  enabled: true
+
+toc:
+  enabled: true
+  title: "Contents"
+  numbered: false               # headings carry their own numbers — list them verbatim
+
+signature:
+  enabled: true
+  links:
+    - label: "Meridian Advisory"
+      url: "https://meridian-advisory.example"
+
+footer:
+  enabled: true
+  showPageNumber: true
+
+pageBreaks:
+  enabled: true
+  beforeH1: true
+  duplex: true                  # blank verso after cover/TOC for double-sided printing
+
+page:
+  size: "a4"
+  orientation: "portrait"
+
+timeout: "60s"

@@ -9,7 +9,8 @@ Chrome (Chromium is auto-downloaded by the library on first run).
   `toc.numbered: false`), footers with page numbers, signature block,
   watermarks, PDF document outline
 - 8 built-in CSS themes (academic, corporate, creative, default, invoice,
-  legal, manuscript, technical) or a custom `.css` file
+  legal, manuscript, technical) or custom styles via `assets.basePath`
+  (loaded as `<basePath>/styles/<name>.css`)
 - YAML config plus per-document frontmatter overrides (dotted keys, see below)
 - Batch mode: a directory as input converts every `.md` in it, sequentially,
   continuing past per-file failures
@@ -74,7 +75,10 @@ Flags and subcommands:
 `md2pdf init` writes a template documenting every option (the same content as
 `all-options.yaml` in this repository). Highlights:
 
-- `style` — theme name or path to a custom `.css` file
+- `style` — a theme name, or a custom style name resolved through
+  `assets.basePath` as `<basePath>/styles/<name>.css` (names may not contain
+  `/` or `.`; `basePath` resolves against the working directory, not the
+  config file)
 - `toc.numbered: false` — list headings verbatim when they carry their own
   numbers (e.g. `## 3. Design`)
 - `pageBreaks.duplex: true` — blank verso after cover/TOC so the body starts

@@ -67,11 +67,14 @@ output:
   defaultDir: "./output"                    # Default output directory (empty = same as source)
 
 # ---------------------------------------------------------------------------
-# style — CSS style name or file path
+# style — CSS style name
 # ---------------------------------------------------------------------------
 # Built-in styles: academic, corporate, creative, default, invoice, legal,
 #                  manuscript, technical
-# Or provide a path to a custom .css file, e.g. "./custom-style.css"
+# Custom styles: set assets.basePath (below) and name a file placed at
+# <basePath>/styles/<name>.css — e.g. style: "corporate-blue" loads
+# <basePath>/styles/corporate-blue.css. Names may not contain '/' or '.'.
+# basePath resolves against the working directory, not this file.
 style: "technical"
 
 # ---------------------------------------------------------------------------

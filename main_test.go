@@ -432,3 +432,30 @@ func TestConvertReportEndToEnd(t *testing.T) {
 		t.Errorf("output suspiciously small: %d bytes; cover, TOC, and a rendered diagram expected", len(data))
 	}
 }
+
+// TestConvertFormalConfigOnly drives the config-only invocation path
+// (`md2pdf testdata/formal.yaml`): input.file resolution, verbatim TOC
+// (toc.numbered: false), duplex page breaks, the signature block, and a
+// custom style loaded via assets.basePath. No mermaid — mmdc not required.
+func TestConvertFormalConfigOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("full PDF render is slow; skipping in -short mode")
+	}
+
+	outPath := filepath.Join(t.TempDir(), "formal.pdf")
+	args := []string{"md2pdf", "-o", outPath, "testdata/formal.yaml"}
+	if err := newApp().Run(context.Background(), args); err != nil {
+		t.Fatalf("config-only convert of testdata/formal.yaml: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Errorf("output does not start with %%PDF- (got %q)", data[:min(8, len(data))])
+	}
+	if len(data) < 10_000 {
+		t.Errorf("output suspiciously small: %d bytes; cover, TOC, signature expected", len(data))
+	}
+}

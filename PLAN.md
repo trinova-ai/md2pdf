@@ -371,12 +371,16 @@ corporate/custom, page orientation/size variants, and `--keep-workspace`.
 
 #### G5.1.2: Formal-report pair — verbatim TOC, duplex, signature, custom CSS
 
-- [ ] Add `testdata/formal.yaml` (`input.file: formal.md`,
+- [x] Add `testdata/formal.yaml` (`input.file: formal.md`,
       `toc.numbered: false`, `pageBreaks.duplex: true`,
-      `signature.enabled: true`, `style: ./formal.css`),
-      `testdata/formal.md` (pre-numbered `## N.` headings, a table), and a
-      small `testdata/formal.css`.
-- [ ] Test: config-only invocation (`md2pdf testdata/formal.yaml`) produces a
+      `signature.enabled: true`, `style: formal` +
+      `assets.basePath: testdata`), `testdata/formal.md` (pre-numbered
+      `## N.` headings, a table), and a small `testdata/styles/formal.css`.
+      Custom styles load as `<basePath>/styles/<name>.css` — the "path to a
+      .css file" story in the README/all-options was wrong; corrected as
+      part of this task. `basePath` being CWD-relative (unlike
+      `input.file`/`cover.logo`) is a known wart.
+- [x] Test: config-only invocation (`md2pdf testdata/formal.yaml`) produces a
       PDF — this also exercises the `input.file` resolution path.
 
 #### G5.1.3: Mermaid width-and-scale fixture
