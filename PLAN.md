@@ -404,7 +404,7 @@ Published tags are immutable: never re-point one, always mint the next
       self-imports, `GOWORK=off` build+test, commit, tag, push the tag,
       reset `dev` to the release commit and rest there; then `go get` the
       tag in md2pdf. Add an `xc` task wrapping it.
-- [ ] Cut `v2.1.2-trinova.1` with the script; tag fetchable from GitHub.
+- [x] Cut `v2.1.2-trinova.1` with the script; tag fetchable from GitHub.
 
 #### G6.1.2: Require the tag; remove the submodule
 

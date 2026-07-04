@@ -260,6 +260,16 @@ Run golangci-lint.
 golangci-lint run
 ```
 
+### release-picoloom
+
+Cut a tagged release of the picoloom fork and bump `go.mod` to it. Set `TAG`
+to the next `-trinova.N` version (published tags are immutable — never
+reuse one). See [Vendored library](#vendored-library-adr-001).
+
+```sh
+scripts/release-picoloom.sh "$TAG"
+```
+
 ### clean
 
 Remove build artifacts.
