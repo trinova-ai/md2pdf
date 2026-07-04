@@ -1,4 +1,4 @@
-module github.com/trinova/md2pdf
+module github.com/trinova-ai/md2pdf
 
 go 1.25.4
 
@@ -22,4 +22,4 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 )
 
-replace github.com/alnah/picoloom/v2 => ./alnah:picoloom
+replace github.com/alnah/picoloom/v2 => ./picoloom

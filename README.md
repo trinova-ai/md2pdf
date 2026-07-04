@@ -1,7 +1,7 @@
 # md2pdf
 
 Convert Markdown to styled PDFs from the command line. A thin Go CLI
-(`github.com/trinova/md2pdf`) around a vendored fork of
+(`github.com/trinova-ai/md2pdf`) around a vendored fork of
 [picoloom](https://github.com/alnah/picoloom), which renders through headless
 Chrome (Chromium is auto-downloaded by the library on first run).
 
@@ -17,17 +17,18 @@ Chrome (Chromium is auto-downloaded by the library on first run).
 
 ## Installation
 
-This repository is local-only: the module path `github.com/trinova/md2pdf` has
-no public remote, so `go install github.com/trinova/md2pdf@latest` does **not**
-work. Install from a checkout of this repository:
+`go install github.com/trinova-ai/md2pdf@latest` does **not** work: the
+picoloom dependency is wired in via a `replace` directive, which `go install`
+rejects for remote modules. Install from a clone with the submodule:
 
 ```sh
-cd md2pdf   # this repository's root
+git clone --recurse-submodules https://github.com/trinova-ai/md2pdf
+cd md2pdf
 go install .
 ```
 
 The picoloom dependency is satisfied by the `replace` directive in `go.mod`,
-which points at the vendored copy in `./alnah:picoloom` (see
+which points at the `./picoloom` git submodule (see
 [Vendored library](#vendored-library-adr-001)). Requires Go 1.25+.
 
 ## Usage
@@ -148,8 +149,9 @@ requires the Mermaid CLI at runtime (see [Transformers](#transformers)).
 
 Upstream renamed to picoloom (repo [alnah/picoloom](https://github.com/alnah/picoloom),
 module `github.com/alnah/picoloom/v2`). This repository vendors the public
-fork [trinova-ai/picoloom](https://github.com/trinova-ai/picoloom) at
-`./alnah:picoloom`, wired in via a `replace` directive in `go.mod`.
+fork [trinova-ai/picoloom](https://github.com/trinova-ai/picoloom) as a git
+submodule at `./picoloom` (pinned to branch `trinova`), wired in via a
+`replace` directive in `go.mod`.
 
 The fork uses a triangular workflow: remote `upstream` (`alnah/picoloom`) is
 fetch-only, remote `origin` (`trinova-ai/picoloom`) receives everything.
@@ -167,12 +169,13 @@ currently 5 commits):
 Sync procedure:
 
 ```sh
-cd alnah:picoloom
+cd picoloom
 git fetch upstream
 git checkout main    && git merge --ff-only upstream/main && git push origin main
 git checkout trinova && git rebase main && git push --force-with-lease origin trinova
 go test ./...                                # conflicts land most often in internal/pipeline/tocinject.go
-cd .. && go install .                        # rebuild the wrapper
+cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack tip
+go install .                                 # rebuild the wrapper
 ```
 
 Long-term exit: upstream these commits as PRs cut per-patch from `main`; each

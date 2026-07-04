@@ -15,8 +15,8 @@ import (
 	"unicode/utf8"
 
 	md2pdf "github.com/alnah/picoloom/v2"
-	"github.com/trinova/md2pdf/transform"
-	"github.com/trinova/md2pdf/transform/mermaid"
+	"github.com/trinova-ai/md2pdf/transform"
+	"github.com/trinova-ai/md2pdf/transform/mermaid"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"
 )

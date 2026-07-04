@@ -1,0 +1,4 @@
+[submodule "picoloom"]
+	path = picoloom
+	url = https://github.com/trinova-ai/picoloom.git
+	branch = trinova

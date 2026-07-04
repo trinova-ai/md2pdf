@@ -1,8 +1,8 @@
 # trinova/md2pdf — wrapper CLI over the vendored picoloom library
 
-A thin CLI (`main.go`, module `github.com/trinova/md2pdf`) that turns Markdown
+A thin CLI (`main.go`, module `github.com/trinova-ai/md2pdf`) that turns Markdown
 into styled PDFs using the vendored [picoloom](https://github.com/alnah/picoloom)
-library (`./alnah:picoloom`). The tool itself is done — config, frontmatter,
+library (`./picoloom`, a git submodule). The tool itself is done — config, frontmatter,
 transformer pipeline (Mermaid → SVG), batch mode, docs (P1–P3). What remains
 is publication (P4): remotes and backup, upstreaming the library patches, and
 a clean lint.
@@ -10,8 +10,8 @@ a clean lint.
 Rules for every task:
 
 - Keep `go build ./...` and `go test ./...` green in the wrapper **and** in
-  `alnah:picoloom` before checking a step off.
-- Never edit `alnah:picoloom/` as a side effect of wrapper work. Library changes
+  `picoloom` before checking a step off.
+- Never edit `picoloom/` as a side effect of wrapper work. Library changes
   are their own commits in that repo, on top of its patch stack (see ADR-001).
 - Reinstall with `go install .` after user-visible changes and smoke-test:
   `md2pdf -c md2pdf.yaml <some.md>` from a directory that has both.
@@ -38,8 +38,8 @@ Implemented, in a single ~500-line `main.go`:
   loader. Single file in, single PDF out; `-o` overrides the output path.
   Config-only invocation: `md2pdf <config>.yaml` resolves the input from
   `input.file` or implicitly `<config-basename>.md` beside the config.
-- **Library** — vendored at `alnah:picoloom`, upstream v2.1.2 plus a
-  local patch stack (ADR-001).
+- **Library** — vendored at `picoloom` (git submodule), upstream v2.1.2 plus
+  a local patch stack (ADR-001).
 
 All phases delivered (P1–P3): transformer pipeline and temp workspace
 (`transform/`), Mermaid rendering registered in `run()` (` ```mermaid ` fences
@@ -53,7 +53,8 @@ proves the mermaid path end-to-end; the hand-rendered SVG workaround in
 The original premise — "use upstream untouched, never fork" — is retired.
 Upstream renamed to picoloom (repo `alnah/picoloom`, module
 `github.com/alnah/picoloom/v2`); we carry a patch stack on the vendored copy
-at `./alnah:picoloom`, a clone of the public fork `trinova-ai/picoloom`.
+at `./picoloom`, a git submodule of the public fork `trinova-ai/picoloom`
+pinned to branch `trinova`.
 
 Triangular layout (decided 2026-07-04): remote `upstream` = `alnah/picoloom`,
 fetch-only; remote `origin` = `trinova-ai/picoloom`. Branch `main` mirrors
@@ -67,12 +68,13 @@ kept checked out so the wrapper's `replace` directive builds against it
 4. `fix: no blank page after cover/TOC when BeforeH1 is set`
 5. `feat: duplex option keeps cover and TOC on their own sheet`
 
-Sync procedure, in `alnah:picoloom/`:
+Sync procedure, in `picoloom/`:
 
 ```sh
 git fetch upstream
 git checkout main    && git merge --ff-only upstream/main && git push origin main
 git checkout trinova && git rebase main && git push --force-with-lease origin trinova
+cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack tip
 ```
 
 Conflicts land most often in `internal/pipeline/tocinject.go`; run the fork's
@@ -237,6 +239,8 @@ The two decisions the README must tell truthfully:
 
 - [x] Correct the module path (`github.com/trinova/md2pdf`, not `trinova-ai`)
       or rename the module — pick one and make install instructions work.
+      (Superseded in P4: the module moved to `github.com/trinova-ai/md2pdf`
+      when the repo was published under the org.)
 - [x] Remove or scope upstream-inherited claims (e.g. "parallel batch
       processing") to what the wrapper actually does; add the vendoring story
       and the sync procedure from ADR-001.
@@ -294,19 +298,21 @@ patch stack onto `trinova`, push.
 
 #### G4.1.2: Push the wrapper repo
 
-- [ ] Create `github.com/trinova-ai/md2pdf` (visibility: René's call at
-      creation time) and rename the module from `github.com/trinova/md2pdf`
-      to `github.com/trinova-ai/md2pdf` — go.mod, the `transform` import in
+- [x] Create `github.com/trinova-ai/md2pdf` (public — decided 2026-07-04)
+      and rename the module from `github.com/trinova/md2pdf` to
+      `github.com/trinova-ai/md2pdf` — go.mod, the `transform` import in
       `main.go`, and the README install instructions.
-- [ ] Decide how a clone obtains `alnah:picoloom` — git submodule pinned to
+- [x] Decide how a clone obtains the vendored fork — git submodule pinned to
       the patch stack, README bootstrap instructions, or dropping `replace`
       in favor of the pushed fork's module path — and implement it (update
-      the README's Vendored library section to match).
-- [ ] Tidy the working tree first: ignore or remove the `md2pdf` binary,
+      the README's Vendored library section to match). Decided: submodule at
+      `./picoloom` (branch `trinova`), replacing the untracked
+      `alnah:picoloom/` working-clone name.
+- [x] Tidy the working tree first: ignore or remove the `md2pdf` binary,
       `.DS_Store`, and `solworktext:md2pdf/` (unrelated reference checkout);
       decide whether `testdata/trust-anchor-strategy.*` and `work.yaml` are
       fixtures worth tracking or scratch to drop.
-- [ ] Create the remote, push `master`, set upstream; verify a fresh clone
+- [x] Create the remote, push `master`, set upstream; verify a fresh clone
       builds and converts `examples/report.md` per the README walkthrough.
 
 ### G4.2: Upstream the patch stack
@@ -318,8 +324,7 @@ drops automatically.
 
 #### G4.2.1: Open upstream PRs for the five patches
 
-- [ ] In `alnah:picoloom/`, run the ADR-001 sync procedure (`git fetch origin
-      && git rebase origin/main`), keep its tests green.
+- [ ] In `picoloom/`, run the ADR-001 sync procedure, keep its tests green.
 - [ ] For each of the five commits, open a PR against `alnah/picoloom` from a
       per-patch branch cut from the fork's `main` — one coherent changeset
       per PR, describing the wrapper's use case in each. Patches 1/3 (TOC)
