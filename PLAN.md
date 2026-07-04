@@ -79,9 +79,9 @@ cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack
 ```
 
 Conflicts land most often in `internal/pipeline/tocinject.go`; run the fork's
-tests, then rebuild the wrapper. Long-term exit: upstream the commits as PRs
-cut per-patch from `main` (Phase P4, G4.2); each merge makes the next rebase
-drop that patch automatically.
+tests, then rebuild the wrapper. Decided 2026-07-05: the patches will NOT be
+upstreamed as PRs — the stack is a permanent feature branch, carried forward
+by the sync procedure above.
 
 ### ADR-002: Dotted frontmatter keys
 
@@ -259,8 +259,9 @@ The two decisions the README must tell truthfully:
 ## Phase P4: Publication
 
 Everything shipped so far exists only on this machine. This phase backs the
-work up, puts the library patches on a path back upstream, and gets the linter
-to zero. Two related loose ends live outside this repo and are deliberately
+work up and gets the linter to zero. (Upstreaming the library patches was
+originally a goal here; dropped 2026-07-05 — see ADR-001.)
+Two related loose ends live outside this repo and are deliberately
 not tasks here: the CrunchGate vault's uncommitted method doc + `md2pdf.yaml`,
 and the out-of-sync `plugins/trinova` copy of the method doc.
 
@@ -315,24 +316,6 @@ patch stack onto `trinova`, push.
       fixtures worth tracking or scratch to drop.
 - [x] Create the remote, push `master`, set upstream; verify a fresh clone
       builds and converts `examples/report.md` per the README walkthrough.
-
-### G4.2: Upstream the patch stack
-
-The long-term exit from ADR-001: every merged PR is one patch the next rebase
-drops automatically.
-
-![[#ADR-001: Vendored fork with a patch stack]]
-
-#### G4.2.1: Open upstream PRs for the five patches
-
-- [ ] In `picoloom/`, run the ADR-001 sync procedure, keep its tests green.
-- [ ] For each of the five commits, open a PR against `alnah/picoloom` from a
-      per-patch branch cut from the fork's `main` — one coherent changeset
-      per PR, describing the wrapper's use case in each. Patches 1/3 (TOC)
-      and 4/5 (blank page/duplex) overlap in `tocinject.go`: open those in
-      dependency order or as two small stacked series.
-- [ ] Record the PR URLs in ADR-001; after any merge, re-run the sync
-      procedure and confirm the stack shrinks.
 
 ### G4.3: Lint zero
 

@@ -186,8 +186,8 @@ cd .. && git add picoloom && git commit -m "Bump picoloom"   # pin the new stack
 go install .                                 # rebuild the wrapper
 ```
 
-Long-term exit: upstream these commits as PRs cut per-patch from `main`; each
-merge makes the next rebase drop that patch automatically.
+The patch stack is a permanent feature branch: it is not upstreamed, and the
+sync procedure above carries it forward across upstream releases.
 
 ## Transformers
 
