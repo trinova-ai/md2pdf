@@ -380,3 +380,50 @@ corporate/custom, page orientation/size variants, and `--keep-workspace`.
       converted through the real CLI (directory input, `-o` out-dir),
       produces two PDFs — the real-render counterpart to the fake-convert
       batch unit tests.
+
+## Phase P6: Tagged-fork dependency — drop the submodule
+
+Decided 2026-07-05 (supersedes the submodule story in ADR-001): the fork
+publishes real tags whose tip is a *generated* module-rename commit
+(`github.com/alnah/picoloom/v2` → `github.com/trinova-ai/picoloom/v2`), and
+md2pdf requires the fork by tag like any normal dependency — no `replace`,
+no submodule. That makes `go install github.com/trinova-ai/md2pdf@latest` a
+working install path. `trinova` stays pure (upstream + patches, PR-able);
+the rename is stamped fresh at each release so it can never conflict. The
+dev loop uses an untracked `go.work` (`use .` + `use ./picoloom`) with the
+nested, untracked fork checkout resting on `dev` (= trinova + rename).
+Published tags are immutable: never re-point one, always mint the next
+`-trinova.N`.
+
+### G6.1: Switch to the tagged fork
+
+#### G6.1.1: Fork release machinery and first tag
+
+- [ ] Add `scripts/release-picoloom.sh <tag> [fork-dir]`: from a clean fork
+      tree — detach from `trinova`, `go mod edit -module` + rewrite
+      self-imports, `GOWORK=off` build+test, commit, tag, push the tag,
+      reset `dev` to the release commit and rest there; then `go get` the
+      tag in md2pdf. Add an `xc` task wrapping it.
+- [ ] Cut `v2.1.2-trinova.1` with the script; tag fetchable from GitHub.
+
+#### G6.1.2: Require the tag; remove the submodule
+
+- [ ] Swap the root import and `go.mod` to
+      `github.com/trinova-ai/picoloom/v2 v2.1.2-trinova.1`; drop the
+      `replace` and the alnah require.
+- [ ] De-submodule: remove the `picoloom` gitlink and `.gitmodules`, clean
+      the submodule config; ignore `/picoloom/`, `go.work`, `go.work.sum`;
+      write the untracked `go.work`.
+- [ ] Both build modes green: `GOWORK=off go test ./...` (pinned tag) and
+      workspace `go test ./...` (dev loop).
+
+#### G6.1.3: Docs, v0.1.0, end-to-end install proof
+
+- [ ] Rewrite README Installation (`go install …@latest`) and Vendored
+      library (tagged fork, release script, `dev` branch, go.work loop);
+      update ADR-001; no `--recurse-submodules` anywhere.
+- [ ] Tag md2pdf `v0.1.0` and push it — `@latest` must not resolve to the
+      ancient `v0.0.1`.
+- [ ] Prove it: from a pristine `GOMODCACHE`,
+      `go install github.com/trinova-ai/md2pdf@latest` and the binary
+      reports `v0.1.0`.
