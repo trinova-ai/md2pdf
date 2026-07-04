@@ -385,10 +385,10 @@ corporate/custom, page orientation/size variants, and `--keep-workspace`.
 
 #### G5.1.3: Mermaid width-and-scale fixture
 
-- [ ] Add `testdata/diagrams.md`: one wide and one narrow diagram plus a bare
+- [x] Add `testdata/diagrams.md`: one wide and one narrow diagram plus a bare
       numeric `mermaid.scale` in its frontmatter (the numeric-key path, end
       to end).
-- [ ] Test: converting it with the walkthrough config produces a PDF; skipped
+- [x] Test: converting it with the walkthrough config produces a PDF; skipped
       without `mmdc`.
 
 #### G5.1.4: Batch conversion end to end

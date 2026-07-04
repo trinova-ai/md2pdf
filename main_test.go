@@ -459,3 +459,32 @@ func TestConvertFormalConfigOnly(t *testing.T) {
 		t.Errorf("output suspiciously small: %d bytes; cover, TOC, signature expected", len(data))
 	}
 }
+
+// TestConvertDiagramsEndToEnd converts testdata/diagrams.md (one wide and
+// one narrow mermaid diagram) with the walkthrough config, exercising the
+// bare numeric mermaid.scale frontmatter key end to end.
+func TestConvertDiagramsEndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("full PDF render is slow; skipping in -short mode")
+	}
+	if _, err := exec.LookPath("mmdc"); err != nil {
+		t.Skip("mmdc not installed; skipping end-to-end conversion test")
+	}
+
+	outPath := filepath.Join(t.TempDir(), "diagrams.pdf")
+	args := []string{"md2pdf", "-c", "testdata/company-config.yaml", "-o", outPath, "testdata/diagrams.md"}
+	if err := newApp().Run(context.Background(), args); err != nil {
+		t.Fatalf("convert testdata/diagrams.md: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if !bytes.HasPrefix(data, []byte("%PDF-")) {
+		t.Errorf("output does not start with %%PDF- (got %q)", data[:min(8, len(data))])
+	}
+	if len(data) < 10_000 {
+		t.Errorf("output suspiciously small: %d bytes; two rendered diagrams expected", len(data))
+	}
+}
