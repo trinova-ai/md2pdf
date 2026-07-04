@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,8 +22,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Version is set at build time via -ldflags "-X main.Version=x.y.z".
+// Version is set at build time via -ldflags "-X main.Version=<tag>" (the xc
+// install task); when it isn't, init resolves it from the module version Go
+// embeds in the binary, and a local build stays "dev".
 var Version = "dev"
+
+func init() { Version = resolveVersion(Version) }
+
+// resolveVersion normalizes an injected version to a "v" prefix and falls
+// back to the binary's embedded module version (go install module@version).
+func resolveVersion(injected string) string {
+	if injected != "" && injected != "dev" {
+		if !strings.HasPrefix(injected, "v") {
+			return "v" + injected
+		}
+		return injected
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if v := bi.Main.Version; v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return "dev"
+}
 
 //go:embed all-options.yaml
 var allOptionsYAML []byte

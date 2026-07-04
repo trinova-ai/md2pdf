@@ -2,10 +2,10 @@
 
 A thin CLI (`main.go`, module `github.com/trinova-ai/md2pdf`) that turns Markdown
 into styled PDFs using the vendored [picoloom](https://github.com/alnah/picoloom)
-library (`./picoloom`, a git submodule). The tool itself is done — config, frontmatter,
-transformer pipeline (Mermaid → SVG), batch mode, docs (P1–P3). What remains
-is publication (P4): remotes and backup, upstreaming the library patches, and
-a clean lint.
+library (`./picoloom`, a git submodule). The plan is fully executed: the tool
+(P1–P3), publication under `trinova-ai` with a clean lint (P4; upstreaming
+the patches was dropped — see ADR-001), and feature-matrix e2e fixtures (P5).
+New work gets a new phase.
 
 Rules for every task:
 

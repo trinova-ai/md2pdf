@@ -217,20 +217,23 @@ Install xc: `go install github.com/joerdav/xc@latest`
 
 Run tasks from the project root with `xc <task-name>`.
 
+### install
+
+Install into `$GOPATH/bin` stamped with the release tag (`git describe`), so
+`md2pdf --version` reports e.g. `v0.0.1` or `v0.0.1-3-gabc1234` between tags.
+
+```sh
+go install -ldflags "-X main.Version=$(git describe --tags --always --dirty)" .
+```
+
 ### install-dev
 
-Install from local source into `$GOPATH/bin`.
+Install from local source into `$GOPATH/bin`. The version falls back to the
+VCS pseudo-version Go embeds in the binary (`dev` when built without VCS
+info); use `install` for a tag-stamped binary.
 
 ```sh
 go install .
-```
-
-### build-dev
-
-Build development binary to `bin/md2pdf-dev`.
-
-```sh
-go build -o bin/md2pdf-dev .
 ```
 
 ### test
@@ -262,11 +265,11 @@ golangci-lint run
 Remove build artifacts.
 
 ```sh
-rm -rf bin/ coverage.out
+rm -f md2pdf coverage.out
 ```
 
 ### all
 
-Requires: clean, test, lint, build-dev
+Requires: clean, test, lint, install-dev
 
 Full development cycle.

@@ -402,6 +402,24 @@ func TestConvertBatchAllFail(t *testing.T) {
 	}
 }
 
+func TestResolveVersion(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"1.2.3", "v1.2.3"},
+		{"v0.0.2", "v0.0.2"},
+		{"v0.0.1-3-gabc1234", "v0.0.1-3-gabc1234"},
+	}
+	for _, c := range cases {
+		if got := resolveVersion(c.in); got != c.want {
+			t.Errorf("resolveVersion(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+	// "dev" falls through to the embedded module version; a test binary has
+	// none, so it stays "dev".
+	if got := resolveVersion("dev"); got != "dev" {
+		t.Errorf("resolveVersion(%q) = %q, want %q", "dev", got, "dev")
+	}
+}
+
 // TestConvertReportEndToEnd drives the real CLI over the testdata pair:
 // company-config.yaml (org defaults: cover, TOC, footer) + report.md
 // (frontmatter metadata, DRAFT watermark, a mermaid diagram). It exercises
