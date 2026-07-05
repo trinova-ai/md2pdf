@@ -565,10 +565,10 @@ rendered PDF, so a regression can never sneak in behind the unit seam.
 
 #### G8.2.1: Prove the frontmatter footer.text in a rendered PDF
 
-- [ ] Add `footer.text` to a testdata fixture whose config enables the
+- [x] Add `footer.text` to a testdata fixture whose config enables the
       footer but carries a different (or no) text — the frontmatter value
       must win in the effective config at the renderer seam.
-- [ ] Extend the e2e test to assert the override at the `buildInput()` seam
+- [x] Extend the e2e test to assert the override at the `buildInput()` seam
       (Config equality, as in the migration render-neutrality test); if
       cheaply possible, also assert the text appears in the PDF bytes or
       extracted text — state the chosen proxy in the test comment.

@@ -1182,6 +1182,80 @@ func TestConvertFormalConfigOnly(t *testing.T) {
 	}
 }
 
+// TestFrontmatterFooterTextEndToEnd proves that footer.text set in a
+// document's frontmatter wins over the value the config carries, all the way
+// to the renderer input. The dedicated fixture pair — testdata/
+// footer-override.yaml (footer.enabled + footer.text "Config Footer Text")
+// and testdata/footer-override.md (frontmatter footer.text "Frontmatter
+// Footer Wins") — isolates this from the report/company-config pair other
+// tests assert on.
+//
+// The AUTHORITATIVE proxy is the effective Config at the buildInput() seam:
+// the exact overlay convertFile performs (config load + frontmatter apply)
+// before handing md2pdf.Input to the renderer. Grepping the raw %PDF bytes
+// for the footer string is unreliable — picoloom renders via headless Chrome,
+// which compresses page content streams (FlateDecode), so the literal footer
+// text is not present as plain bytes. We therefore assert at the Config/Input
+// seam and, under the render guard, only that a valid PDF is produced.
+func TestFrontmatterFooterTextEndToEnd(t *testing.T) {
+	const (
+		configPath = "testdata/footer-override.yaml"
+		mdPath     = "testdata/footer-override.md"
+		wantText   = "Frontmatter Footer Wins"
+		configText = "Config Footer Text"
+	)
+
+	// Seam assertion (fast, no render, always runs): the frontmatter value
+	// must win in the effective config and reach md2pdf.Input.Footer.Text via
+	// buildInput — while footer enablement stays owned by the config.
+	t.Run("frontmatter value wins at the buildInput seam", func(t *testing.T) {
+		cfg := effectiveConfig(t, configPath, mdPath)
+		if cfg.Footer.Text != wantText {
+			t.Errorf("effective Footer.Text = %q, want %q (frontmatter override)", cfg.Footer.Text, wantText)
+		}
+		if cfg.Footer.Text == configText {
+			t.Errorf("effective Footer.Text = %q, still the config value — frontmatter did not override", cfg.Footer.Text)
+		}
+		if !cfg.Footer.Enabled {
+			t.Error("Footer.Enabled = false, want true — the config enables the footer, frontmatter must not disturb it")
+		}
+		in := buildInput("# Body\n", mdPath, "", &cfg)
+		if in.Footer == nil {
+			t.Fatal("buildInput produced no Footer though footer.enabled is true")
+		}
+		if in.Footer.Text != wantText {
+			t.Errorf("Input.Footer.Text = %q, want %q — the overridden text must reach the renderer input", in.Footer.Text, wantText)
+		}
+	})
+
+	// Render guard: a real headless-Chrome render of the pair must still
+	// succeed. Slow, so skipped in -short. The fixture has no mermaid, so mmdc
+	// is not strictly required, but the guard is kept for parity with the
+	// other end-to-end renders.
+	t.Run("real render produces a valid PDF", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("full PDF render is slow; skipping in -short mode")
+		}
+		if _, err := exec.LookPath("mmdc"); err != nil {
+			t.Skip("mmdc not installed; skipping end-to-end conversion test")
+		}
+
+		outPath := filepath.Join(t.TempDir(), "footer-override.pdf")
+		args := []string{"md2pdf", "-c", configPath, "-o", outPath, mdPath}
+		if err := newApp().Run(context.Background(), args); err != nil {
+			t.Fatalf("convert %s: %v", mdPath, err)
+		}
+
+		data, err := os.ReadFile(outPath)
+		if err != nil {
+			t.Fatalf("read output: %v", err)
+		}
+		if !bytes.HasPrefix(data, []byte("%PDF-")) {
+			t.Errorf("output does not start with %%PDF- (got %q)", data[:min(8, len(data))])
+		}
+	})
+}
+
 // TestConvertDiagramsEndToEnd converts testdata/diagrams.md (one wide and
 // one narrow mermaid diagram) with the walkthrough config, exercising the
 // bare numeric mermaid.scale frontmatter key end to end.

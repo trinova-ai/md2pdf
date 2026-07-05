@@ -1,0 +1,21 @@
+# =============================================================================
+# testdata/footer-override.yaml — footer.text override fixture
+# =============================================================================
+#
+# A deliberately small config that enables the footer and gives it its own
+# text ("Config Footer Text"). The paired document testdata/footer-override.md
+# sets a DIFFERENT footer.text in its frontmatter, so the effective config at
+# the renderer seam must carry the document's value, not this one — footer.text
+# overrides but never enables the footer, so the config still owns enablement.
+#
+#   md2pdf -c testdata/footer-override.yaml testdata/footer-override.md
+#
+# Drives TestFrontmatterFooterTextEndToEnd in main_test.go. Kept separate from
+# the company-config/report pair so this override cannot disturb tests that
+# assert on that pair's metadata.
+
+footer:
+  enabled: true
+  position: "right"
+  showPageNumber: true
+  text: "Config Footer Text"
