@@ -119,7 +119,9 @@ Rules:
   quote it.
 - Supported keys: every `document.*` and `author.*` field, plus
   `watermark.text`, which sets the text **and** enables the watermark for that
-  document even when the config leaves the watermark off.
+  document even when the config leaves the watermark off, and `footer.text`,
+  which overrides the footer text but does **not** enable the footer — the
+  config decides whether a footer exists, the document only what it says.
 - `mermaid.scale` is the one numeric key: it overrides the diagram symbol
   size per document (see [Transformers](#transformers)). Bare numbers are
   fine here: `mermaid.scale: 0.62`.

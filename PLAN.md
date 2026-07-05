@@ -472,13 +472,13 @@ footer exists, the document only decides *what it says*.
 
 #### G7.1.1: Add footer.text to the frontmatter key set
 
-- [ ] Add `"footer.text": &cfg.Footer.Text` to `frontmatterTargets()` — the
+- [x] Add `"footer.text": &cfg.Footer.Text` to `frontmatterTargets()` — the
       one table drives parsing, validation, and application, so no other
       code change is needed.
-- [ ] Document the key everywhere the frontmatter set is listed: the
+- [x] Document the key everywhere the frontmatter set is listed: the
       `extractFrontmatter` doc comment, `all-options.yaml`'s frontmatter
       notes, and the README's frontmatter section.
-- [ ] Tests: frontmatter `footer.text` overrides the config's text; with
+- [x] Tests: frontmatter `footer.text` overrides the config's text; with
       `footer.enabled: false` in the config the footer stays off even when
       frontmatter sets `footer.text`.
 

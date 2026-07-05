@@ -200,6 +200,41 @@ func TestApplyFrontmatterWatermark(t *testing.T) {
 	})
 }
 
+// TestApplyFrontmatterFooterText: footer.text overrides the footer text per
+// document but, unlike watermark.text, must NOT enable the footer — the
+// config decides whether a footer exists, the document only what it says.
+func TestApplyFrontmatterFooterText(t *testing.T) {
+	t.Run("overrides configured text", func(t *testing.T) {
+		cfg := Config{Footer: FooterConfig{Enabled: true, Text: "TriNova — Draft for internal use"}}
+		applyFrontmatter(map[string]string{"footer.text": "Final"}, &cfg)
+		if cfg.Footer.Text != "Final" {
+			t.Errorf("Footer.Text = %q, want %q", cfg.Footer.Text, "Final")
+		}
+		if !cfg.Footer.Enabled {
+			t.Error("Footer.Enabled = false, want true (untouched)")
+		}
+	})
+
+	t.Run("does not enable a disabled footer", func(t *testing.T) {
+		var cfg Config
+		applyFrontmatter(map[string]string{"footer.text": "Final"}, &cfg)
+		if cfg.Footer.Enabled {
+			t.Error("Footer.Enabled = true, want false — footer.text must not enable the footer")
+		}
+		if cfg.Footer.Text != "Final" {
+			t.Errorf("Footer.Text = %q, want %q", cfg.Footer.Text, "Final")
+		}
+	})
+
+	t.Run("empty value is ignored", func(t *testing.T) {
+		cfg := Config{Footer: FooterConfig{Enabled: true, Text: "Kept"}}
+		applyFrontmatter(map[string]string{"footer.text": ""}, &cfg)
+		if cfg.Footer.Text != "Kept" {
+			t.Errorf("Footer.Text = %q, want %q", cfg.Footer.Text, "Kept")
+		}
+	})
+}
+
 // TestParseFrontmatterOverlongKnownValue: a known key whose value exceeds the
 // cap is rejected, naming the key; a value exactly at the cap passes.
 func TestParseFrontmatterOverlongKnownValue(t *testing.T) {
