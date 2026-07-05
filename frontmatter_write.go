@@ -8,6 +8,7 @@ package main
 // and keys the document already carries are never touched.
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
@@ -176,4 +177,115 @@ func mergeFrontmatter(content string, values map[string]string) (merged string, 
 		block += nl // blank line between the new block and the existing body
 	}
 	return block + content, added, nil
+}
+
+// migratedConfigKeys returns the subset of the config's eligible keys (the
+// keys of values) that the merged document's frontmatter now carries WITH a
+// value — the keys safe to strip from the config. A key just added by the
+// merge always qualifies; a key the document already carried with its own
+// value qualifies too, because frontmatter outranks the config even when the
+// two values differ — stripping the config's copy is render-neutral either
+// way. A key the document carries only as an empty scaffold (`author.name:`
+// or `author.name: ""`) does NOT override the config and must stay.
+func migratedConfigKeys(mergedDoc string, values map[string]string) ([]string, error) {
+	_, fm, _, err := extractFrontmatter(mergedDoc)
+	if err != nil {
+		return nil, err
+	}
+	var keys []string
+	for key := range values {
+		if fm[key] != "" {
+			keys = append(keys, key)
+		}
+	}
+	sortFrontmatterKeys(keys)
+	return keys, nil
+}
+
+// stripConfigKeys removes the given dotted keys (section.field) from the raw
+// config YAML via the yaml.v3 node API, so comments and the ordering of every
+// untouched setting survive the rewrite. A comment on a removed entry is
+// removed with it — it documented that setting. A section mapping emptied by
+// the removals (`document:`, `author:`) is dropped too; a head comment sitting
+// directly on the dropped section key is transferred to the next top-level key
+// so a file banner cannot vanish (a banner separated by a blank line attaches
+// to the document node and is never at risk). removed lists the keys actually
+// deleted; when it is empty the input bytes come back byte-for-byte unchanged
+// — no re-encoding, no formatting normalization.
+func stripConfigKeys(data []byte, keys []string) (out []byte, removed []string, err error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, nil, fmt.Errorf("parsing config: %w", err)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 {
+		return data, nil, nil // empty config: nothing to strip
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return data, nil, nil
+	}
+
+	for _, key := range keys {
+		section, field, ok := strings.Cut(key, ".")
+		if !ok {
+			continue
+		}
+		si := findMapEntry(root, section)
+		if si < 0 || root.Content[si+1].Kind != yaml.MappingNode {
+			continue
+		}
+		sec := root.Content[si+1]
+		fi := findMapEntry(sec, field)
+		if fi < 0 {
+			continue
+		}
+		sec.Content = append(sec.Content[:fi], sec.Content[fi+2:]...)
+		removed = append(removed, key)
+		if len(sec.Content) == 0 {
+			dropMapEntry(root, si)
+		}
+	}
+	if len(removed) == 0 {
+		return data, nil, nil
+	}
+
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		return nil, nil, fmt.Errorf("re-encoding config: %w", err)
+	}
+	if err := enc.Close(); err != nil {
+		return nil, nil, fmt.Errorf("re-encoding config: %w", err)
+	}
+	return buf.Bytes(), removed, nil
+}
+
+// findMapEntry returns the Content index of the key node named key in a
+// mapping node, or -1. Mapping Content alternates key, value.
+func findMapEntry(mapping *yaml.Node, key string) int {
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return i
+		}
+	}
+	return -1
+}
+
+// dropMapEntry deletes the key/value pair at key index i, transferring the
+// removed key's head comment to the following key (prepended, blank line
+// between) so a banner sitting directly on the first section survives its
+// removal. When the removed pair is the last one the comment has no anchor
+// left and goes with it.
+func dropMapEntry(mapping *yaml.Node, i int) {
+	head := mapping.Content[i].HeadComment
+	mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+	if head == "" || i >= len(mapping.Content) {
+		return
+	}
+	next := mapping.Content[i]
+	if next.HeadComment != "" {
+		head += "\n\n" + next.HeadComment
+	}
+	next.HeadComment = head
 }

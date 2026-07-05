@@ -65,6 +65,7 @@ Flags and subcommands:
 | `--verbose` | list ignored unknown frontmatter keys (typo discovery) |
 | `--keep-workspace` | keep the transformer workspace directory and print its path |
 | `init [filename]` | write an exhaustively commented config template |
+| `frontmatter [-c FILE] [--dry-run] <input.md>` | move document metadata from the config into the .md frontmatter ([details](#moving-metadata-into-the-document-md2pdf-frontmatter)) |
 
 ## Configuration
 
@@ -130,6 +131,36 @@ Rules:
 
 In batch mode each file's frontmatter overrides the shared config for that
 file only.
+
+### Moving metadata into the document: `md2pdf frontmatter`
+
+A config that carries `document.title`, `author.name`, … only fits one
+document. `md2pdf frontmatter` migrates that metadata into the document
+itself, leaving a style-only config you can reuse across every document:
+
+```sh
+md2pdf frontmatter -c trinova-technical.yaml report.md   # migrate once
+md2pdf -c trinova-technical.yaml report.md               # renders the same PDF
+md2pdf -c trinova-technical.yaml other-doc.md            # config now reusable
+```
+
+With `-c`, every eligible key the config carries (`document.*`, `author.*`,
+`watermark.text`, `footer.text`, `mermaid.scale`) is added to the document's
+frontmatter block — created if the file has none — and stripped from the
+config. The rewrite preserves comments and the ordering of untouched
+settings, and drops sections left empty (`document:`, `author:`).
+
+The migration is render-neutral: frontmatter outranks the config, so moving
+a key never changes the produced PDF. Keys already present in the document
+win and stay byte-for-byte untouched — they are still stripped from the
+config, since the document's value outranks the config's even when the two
+differ. A key the document carries only as an empty scaffold (a bare
+`author.name:`) overrides nothing and stays in the config. Unknown/private
+frontmatter keys are never touched.
+
+Without `-c` the subcommand writes an empty `document.*`/`author.*` scaffold
+for you to fill in. `--dry-run` prints both rewritten files without touching
+disk.
 
 ## Examples
 

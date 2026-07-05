@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func writeTestFile(t *testing.T, path string) {
@@ -683,6 +686,354 @@ func TestMergeFrontmatter(t *testing.T) {
 			t.Errorf("err = %v, want frontmatter parse error", err)
 		}
 	})
+}
+
+// TestMigratedConfigKeys pins the strip policy: a config key is safe to
+// remove exactly when the merged document carries it WITH a value — whether
+// the merge just added it or the document already had its own (possibly
+// different) value, frontmatter outranks the config either way. An empty
+// scaffold (`key:` or `key: ""`) overrides nothing, so its config key stays.
+func TestMigratedConfigKeys(t *testing.T) {
+	values := map[string]string{
+		"document.title": "Config Title", // doc carries its own different value
+		"document.date":  "auto",         // doc carries it only as an empty scaffold
+		"author.name":    "Sarah Chen",   // just added by the merge
+	}
+	merged := "---\n" +
+		"document.title: \"Doc Title\"\n" +
+		"document.date:\n" +
+		"author.name: \"Sarah Chen\"\n" +
+		"---\nbody\n"
+
+	got, err := migratedConfigKeys(merged, values)
+	if err != nil {
+		t.Fatalf("migratedConfigKeys: %v", err)
+	}
+	want := []string{"document.title", "author.name"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("migratedConfigKeys = %v, want %v", got, want)
+	}
+}
+
+// TestStripConfigKeys: the yaml.v3 node rewrite behind `frontmatter -c` —
+// migrated keys removed, comments and ordering of untouched settings
+// preserved, emptied sections dropped, and a no-op returning the input
+// byte-for-byte.
+func TestStripConfigKeys(t *testing.T) {
+	t.Run("removes keys and preserves comments and order", func(t *testing.T) {
+		in := "# banner comment\n\n" +
+			"style: \"corporate\"\n" +
+			"footer:\n" +
+			"  enabled: true\n" +
+			"  text: \"Draft\"\n" +
+			"  position: \"right\"   # keep me\n" +
+			"watermark:\n" +
+			"  enabled: true\n" +
+			"  text: \"DRAFT\"\n"
+		out, removed, err := stripConfigKeys([]byte(in), []string{"footer.text", "watermark.text"})
+		if err != nil {
+			t.Fatalf("stripConfigKeys: %v", err)
+		}
+		if want := []string{"footer.text", "watermark.text"}; !reflect.DeepEqual(removed, want) {
+			t.Errorf("removed = %v, want %v", removed, want)
+		}
+		got := string(out)
+		for _, want := range []string{"# banner comment", "style: \"corporate\"", "enabled: true", "# keep me"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("output missing %q:\n%s", want, got)
+			}
+		}
+		for _, gone := range []string{"Draft", "DRAFT", "text:"} {
+			if strings.Contains(got, gone) {
+				t.Errorf("output still contains %q:\n%s", gone, got)
+			}
+		}
+		if fi, wi := strings.Index(got, "footer:"), strings.Index(got, "watermark:"); fi < 0 || wi < 0 || fi > wi {
+			t.Errorf("section order not preserved (footer at %d, watermark at %d):\n%s", fi, wi, got)
+		}
+	})
+
+	t.Run("drops emptied document and author sections", func(t *testing.T) {
+		in := "document:\n  title: \"T\"\nauthor:\n  name: \"A\"\n  email: \"a@b.c\"\nstyle: \"formal\"\n"
+		out, removed, err := stripConfigKeys([]byte(in), []string{"document.title", "author.name", "author.email"})
+		if err != nil {
+			t.Fatalf("stripConfigKeys: %v", err)
+		}
+		if len(removed) != 3 {
+			t.Errorf("removed = %v, want 3 keys", removed)
+		}
+		got := string(out)
+		for _, gone := range []string{"document:", "author:"} {
+			if strings.Contains(got, gone) {
+				t.Errorf("emptied section %q not dropped:\n%s", gone, got)
+			}
+		}
+		if !strings.Contains(got, "style: \"formal\"") {
+			t.Errorf("untouched style lost:\n%s", got)
+		}
+	})
+
+	t.Run("head comment on dropped first section moves to next key", func(t *testing.T) {
+		// No blank line: this comment attaches to the `author` key node, not
+		// the document node, and would vanish with the section without the
+		// transfer in dropMapEntry.
+		in := "# shared org defaults\nauthor:\n  name: \"A\"\nstyle: \"formal\"\n"
+		out, _, err := stripConfigKeys([]byte(in), []string{"author.name"})
+		if err != nil {
+			t.Fatalf("stripConfigKeys: %v", err)
+		}
+		got := string(out)
+		if !strings.Contains(got, "# shared org defaults") {
+			t.Errorf("banner comment lost:\n%s", got)
+		}
+		if strings.Contains(got, "author:") {
+			t.Errorf("emptied author section not dropped:\n%s", got)
+		}
+	})
+
+	t.Run("nothing removed returns input byte-for-byte", func(t *testing.T) {
+		in := "style:   \"formal\"    # odd spacing survives because no rewrite happens\n"
+		out, removed, err := stripConfigKeys([]byte(in), []string{"footer.text", "document.title"})
+		if err != nil {
+			t.Fatalf("stripConfigKeys: %v", err)
+		}
+		if len(removed) != 0 {
+			t.Errorf("removed = %v, want none", removed)
+		}
+		if string(out) != in {
+			t.Errorf("out = %q, want unchanged input %q", out, in)
+		}
+	})
+
+	t.Run("empty config passes through", func(t *testing.T) {
+		out, removed, err := stripConfigKeys(nil, []string{"document.title"})
+		if err != nil {
+			t.Fatalf("stripConfigKeys: %v", err)
+		}
+		if len(out) != 0 || len(removed) != 0 {
+			t.Errorf("out = %q, removed = %v, want both empty", out, removed)
+		}
+	})
+
+	t.Run("invalid yaml errors", func(t *testing.T) {
+		_, _, err := stripConfigKeys([]byte("{"), []string{"document.title"})
+		if err == nil || !strings.Contains(err.Error(), "parsing config") {
+			t.Errorf("err = %v, want parsing error", err)
+		}
+	})
+}
+
+// copyTestFile copies src into dir under the same basename and returns the
+// new path.
+func copyTestFile(t *testing.T, dir, src string) string {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read %s: %v", src, err)
+	}
+	dst := filepath.Join(dir, filepath.Base(src))
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatalf("write %s: %v", dst, err)
+	}
+	return dst
+}
+
+// effectiveConfig computes the config a render would use for the pair:
+// config file loaded, then the document's frontmatter applied on top —
+// exactly the overlay convertFile performs before building the input.
+func effectiveConfig(t *testing.T, configPath, mdPath string) Config {
+	t.Helper()
+	var cfg Config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("parse config: %v", err)
+	}
+	md, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("read markdown: %v", err)
+	}
+	_, fm, _, err := extractFrontmatter(string(md))
+	if err != nil {
+		t.Fatalf("extract frontmatter: %v", err)
+	}
+	applyFrontmatter(fm, &cfg)
+	return cfg
+}
+
+// TestRunFrontmatterCommand drives the subcommand through the real CLI on
+// temp copies of the testdata pair: migration, dry-run isolation, and the
+// missing-argument error.
+func TestRunFrontmatterCommand(t *testing.T) {
+	t.Run("migrates the testdata pair", func(t *testing.T) {
+		dir := t.TempDir()
+		md := copyTestFile(t, dir, "testdata/report.md")
+		cfgPath := copyTestFile(t, dir, "testdata/company-config.yaml")
+
+		args := []string{"md2pdf", "frontmatter", "-c", cfgPath, md}
+		if err := newApp().Run(context.Background(), args); err != nil {
+			t.Fatalf("frontmatter subcommand: %v", err)
+		}
+
+		// The document gained the config's author.* keys; its own keys and
+		// body are untouched.
+		mdOut, err := os.ReadFile(md)
+		if err != nil {
+			t.Fatalf("read migrated markdown: %v", err)
+		}
+		for _, want := range []string{
+			"author.name: \"Sarah Chen\"",
+			"document.title: \"API Gateway Security Review\"", // pre-existing, verbatim
+			"watermark.text: \"DRAFT\"",
+		} {
+			if !strings.Contains(string(mdOut), want) {
+				t.Errorf("migrated markdown missing %q", want)
+			}
+		}
+
+		// The config lost the whole author section but kept everything else,
+		// including its banner comment.
+		cfgOut, err := os.ReadFile(cfgPath)
+		if err != nil {
+			t.Fatalf("read rewritten config: %v", err)
+		}
+		// The banner comment legitimately mentions the word author; only the
+		// section key itself must be gone.
+		if strings.Contains(string(cfgOut), "author:") {
+			t.Errorf("rewritten config still has an author: section:\n%s", cfgOut)
+		}
+		for _, want := range []string{"org-wide defaults", "style: \"corporate\"", "footer:", "showPageNumber: true"} {
+			if !strings.Contains(string(cfgOut), want) {
+				t.Errorf("rewritten config missing %q:\n%s", want, cfgOut)
+			}
+		}
+		var cfg Config
+		if err := yaml.Unmarshal(cfgOut, &cfg); err != nil {
+			t.Fatalf("rewritten config does not parse: %v", err)
+		}
+		if cfg.Author != (AuthorConfig{}) || cfg.Document != (DocumentConfig{}) {
+			t.Errorf("rewritten config still carries metadata: author %+v, document %+v", cfg.Author, cfg.Document)
+		}
+	})
+
+	t.Run("dry-run prints both files and touches nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		md := copyTestFile(t, dir, "testdata/report.md")
+		cfgPath := copyTestFile(t, dir, "testdata/company-config.yaml")
+		mdBefore, _ := os.ReadFile(md)
+		cfgBefore, _ := os.ReadFile(cfgPath)
+
+		// The subcommand prints to os.Stdout (matching the converter's
+		// "Created …" convention), so capture it via a pipe.
+		orig := os.Stdout
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("pipe: %v", err)
+		}
+		os.Stdout = w
+		runErr := newApp().Run(context.Background(), []string{"md2pdf", "frontmatter", "--dry-run", "-c", cfgPath, md})
+		w.Close()
+		os.Stdout = orig
+		out, _ := io.ReadAll(r)
+		if runErr != nil {
+			t.Fatalf("frontmatter --dry-run: %v", runErr)
+		}
+
+		for _, want := range []string{
+			"==> " + md + " <==",
+			"==> " + cfgPath + " <==",
+			"author.name: \"Sarah Chen\"", // the would-be migrated document
+		} {
+			if !strings.Contains(string(out), want) {
+				t.Errorf("dry-run output missing %q", want)
+			}
+		}
+		if mdAfter, _ := os.ReadFile(md); !bytes.Equal(mdBefore, mdAfter) {
+			t.Error("dry-run modified the markdown file")
+		}
+		if cfgAfter, _ := os.ReadFile(cfgPath); !bytes.Equal(cfgBefore, cfgAfter) {
+			t.Error("dry-run modified the config file")
+		}
+	})
+
+	t.Run("missing input argument errors", func(t *testing.T) {
+		err := newApp().Run(context.Background(), []string{"md2pdf", "frontmatter"})
+		if err == nil || !strings.Contains(err.Error(), "input.md") {
+			t.Errorf("err = %v, want missing <input.md> error", err)
+		}
+	})
+}
+
+// TestFrontmatterMigrationRenderNeutral is the end-to-end render-neutrality
+// check for G7.2: convert the testdata pair before and after `md2pdf
+// frontmatter` (on temp copies) and require the same cover/footer metadata.
+// Extracting text from the PDFs would be overkill (and byte comparison is
+// impossible — PDFs embed timestamps), so the metadata assertion runs at the
+// exact seam the renderer consumes: the effective Config after config load +
+// frontmatter overlay must be identical before and after migration, and both
+// real renders must succeed and produce valid PDFs.
+func TestFrontmatterMigrationRenderNeutral(t *testing.T) {
+	if testing.Short() {
+		t.Skip("full PDF render is slow; skipping in -short mode")
+	}
+	if _, err := exec.LookPath("mmdc"); err != nil {
+		t.Skip("mmdc not installed; skipping end-to-end conversion test")
+	}
+
+	dir := t.TempDir()
+	md := copyTestFile(t, dir, "testdata/report.md")
+	cfgPath := copyTestFile(t, dir, "testdata/company-config.yaml")
+	copyTestFile(t, dir, "testdata/trinova-mark.svg") // cover.logo, config-relative
+
+	render := func(name string) []byte {
+		t.Helper()
+		out := filepath.Join(dir, name)
+		args := []string{"md2pdf", "-c", cfgPath, "-o", out, md}
+		if err := newApp().Run(context.Background(), args); err != nil {
+			t.Fatalf("render %s: %v", name, err)
+		}
+		data, err := os.ReadFile(out)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		if !bytes.HasPrefix(data, []byte("%PDF-")) {
+			t.Errorf("%s does not start with %%PDF-", name)
+		}
+		return data
+	}
+
+	before := render("before.pdf")
+	wantCfg := effectiveConfig(t, cfgPath, md)
+
+	args := []string{"md2pdf", "frontmatter", "-c", cfgPath, md}
+	if err := newApp().Run(context.Background(), args); err != nil {
+		t.Fatalf("frontmatter migration: %v", err)
+	}
+
+	// The migrated yaml must carry no document.*/author.* values at all.
+	var migrated Config
+	cfgData, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read migrated config: %v", err)
+	}
+	if err := yaml.Unmarshal(cfgData, &migrated); err != nil {
+		t.Fatalf("parse migrated config: %v", err)
+	}
+	if migrated.Document != (DocumentConfig{}) || migrated.Author != (AuthorConfig{}) {
+		t.Errorf("migrated config still carries metadata: document %+v, author %+v", migrated.Document, migrated.Author)
+	}
+
+	gotCfg := effectiveConfig(t, cfgPath, md)
+	if !reflect.DeepEqual(wantCfg, gotCfg) {
+		t.Errorf("effective config changed by migration:\nbefore: %+v\nafter:  %+v", wantCfg, gotCfg)
+	}
+
+	after := render("after.pdf")
+	if len(before) < 10_000 || len(after) < 10_000 {
+		t.Errorf("suspiciously small PDFs: before %d bytes, after %d bytes", len(before), len(after))
+	}
 }
 
 // TestConvertReportEndToEnd drives the real CLI over the testdata pair:

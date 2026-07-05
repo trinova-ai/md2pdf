@@ -509,15 +509,15 @@ about the produced PDF.
 
 #### G7.2.2: Config cleanup, dry-run, docs
 
-- [ ] With `-c`: after migrating, rewrite the yaml with the migrated keys
+- [x] With `-c`: after migrating, rewrite the yaml with the migrated keys
       removed — use the yaml.v3 node API so comments and ordering of
       untouched settings survive — and drop sections left empty
       (`document:`, `author:`).
-- [ ] `--dry-run` prints both rewritten files without touching disk.
-- [ ] Document the subcommand in the README and `--help`, including the
+- [x] `--dry-run` prints both rewritten files without touching disk.
+- [x] Document the subcommand in the README and `--help`, including the
       reusable-style workflow it enables
       (`md2pdf -c trinova-technical.yaml <doc>.md`).
-- [ ] Test: end-to-end render-neutrality — convert `testdata/report.md`
+- [x] Test: end-to-end render-neutrality — convert `testdata/report.md`
       with `testdata/company-config.yaml` before and after migration (on
       temp copies) and assert the same cover/footer metadata; the migrated
       yaml contains no `document.*`/`author.*` values.

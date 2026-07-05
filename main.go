@@ -222,6 +222,41 @@ func newApp() *cli.Command {
 				},
 				Action: runInit,
 			},
+			{
+				Name:      "frontmatter",
+				Usage:     "Move document metadata from the config into the .md frontmatter",
+				ArgsUsage: "<input.md>",
+				Description: "Migrates document-specific metadata into the document itself. With -c,\n" +
+					"every eligible key the config carries — document.*, author.*,\n" +
+					"watermark.text, footer.text, mermaid.scale — is added to the document's\n" +
+					"frontmatter block (created when missing) and stripped from the config,\n" +
+					"leaving a style-only config shareable across documents:\n\n" +
+					"   md2pdf frontmatter -c trinova-technical.yaml report.md\n" +
+					"   md2pdf -c trinova-technical.yaml report.md   # renders the same PDF\n\n" +
+					"The migration is render-neutral: frontmatter outranks the config, so\n" +
+					"moving a key never changes the produced PDF. Keys already present in the\n" +
+					"document win and are left byte-for-byte untouched — and are still\n" +
+					"stripped from the config, because the document's value outranks the\n" +
+					"config's even when the two differ. A key the document carries only as an\n" +
+					"empty scaffold (a bare `author.name:`) overrides nothing and stays in the\n" +
+					"config. Unknown/private frontmatter keys are never touched; comments and\n" +
+					"ordering of the config's remaining settings survive the rewrite, and\n" +
+					"sections left empty (document:, author:) are dropped.\n\n" +
+					"Without -c, an empty document.*/author.* scaffold is written for the\n" +
+					"author to fill in.",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "config",
+						Aliases: []string{"c"},
+						Usage:   "config `FILE` (YAML) to migrate keys from and rewrite",
+					},
+					&cli.BoolFlag{
+						Name:  "dry-run",
+						Usage: "print both rewritten files without touching disk",
+					},
+				},
+				Action: runFrontmatter,
+			},
 		},
 	}
 }
@@ -246,6 +281,97 @@ func runInit(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Printf("Created %s\n", name)
 	return nil
+}
+
+// runFrontmatter implements `md2pdf frontmatter [-c config.yaml] [--dry-run]
+// <input.md>`: merge the config's eligible metadata into the document's
+// frontmatter block, then strip every key the document now carries with a
+// value from the config (see migratedConfigKeys for why that is
+// render-neutral even for keys the document already had). Everything is
+// computed before anything is written, so an error never leaves the pair
+// half-migrated; --dry-run prints both results instead of writing them.
+func runFrontmatter(ctx context.Context, cmd *cli.Command) error {
+	inputPath := cmd.Args().First()
+	if inputPath == "" {
+		return fmt.Errorf("frontmatter: missing <input.md> argument")
+	}
+	configPath := cmd.String("config")
+
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return fmt.Errorf("reading input: %w", err)
+	}
+
+	// Without a config the migration source is the built-in scaffold: empty
+	// document.*/author.* keys for the author to fill in.
+	values := scaffoldFrontmatterValues()
+	var cfgData []byte
+	if configPath != "" {
+		cfgData, err = os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("reading config: %w", err)
+		}
+		cfg := &Config{}
+		if err := yaml.Unmarshal(cfgData, cfg); err != nil {
+			return fmt.Errorf("parsing config: %w", err)
+		}
+		values = frontmatterValues(cfg)
+	}
+
+	merged, added, err := mergeFrontmatter(string(data), values)
+	if err != nil {
+		return err
+	}
+
+	var newCfg []byte
+	var removed []string
+	if configPath != "" {
+		strip, err := migratedConfigKeys(merged, values)
+		if err != nil {
+			return err
+		}
+		if newCfg, removed, err = stripConfigKeys(cfgData, strip); err != nil {
+			return err
+		}
+	}
+
+	if cmd.Bool("dry-run") {
+		printDryRunFile(inputPath, merged)
+		if configPath != "" {
+			printDryRunFile(configPath, string(newCfg))
+		}
+		return nil
+	}
+
+	if len(added) > 0 {
+		if err := os.WriteFile(inputPath, []byte(merged), 0o644); err != nil {
+			return fmt.Errorf("writing input: %w", err)
+		}
+		fmt.Printf("Updated %s: added %s\n", inputPath, strings.Join(added, ", "))
+	} else {
+		fmt.Printf("Unchanged %s: nothing to add\n", inputPath)
+	}
+	if configPath != "" {
+		if len(removed) > 0 {
+			if err := os.WriteFile(configPath, newCfg, 0o644); err != nil {
+				return fmt.Errorf("writing config: %w", err)
+			}
+			fmt.Printf("Updated %s: removed %s\n", configPath, strings.Join(removed, ", "))
+		} else {
+			fmt.Printf("Unchanged %s: no migrated keys to remove\n", configPath)
+		}
+	}
+	return nil
+}
+
+// printDryRunFile prints one would-be file with a head(1)-style `==> path <==`
+// header, adding a final newline when the content lacks one so the next
+// header starts on its own line.
+func printDryRunFile(path, content string) {
+	fmt.Printf("==> %s <==\n%s", path, content)
+	if !strings.HasSuffix(content, "\n") {
+		fmt.Println()
+	}
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
