@@ -444,3 +444,80 @@ Published tags are immutable: never re-point one, always mint the next
 - [x] Prove it: from a pristine `GOMODCACHE`,
       `go install github.com/trinova-ai/md2pdf@latest` and the binary
       reports `v0.1.0`.
+
+## Phase P7: Style/document split — footer.text override and a frontmatter subcommand
+
+A config yaml should be reusable across documents as a house style (e.g. a
+shared `trinova-technical.yaml`); everything document-specific belongs in the
+document's frontmatter. Driver (2026-07-05): the TraceGate method doc, whose
+config carried `footer.text: "TriNova — Draft for internal use"` — document
+status baked into what should be a shared style file. Two gaps block the
+split: `footer.text` is the only footer *content* not overridable per
+document, and moving metadata out of an existing config into a document's
+frontmatter is manual. Renaming/sharing the vault's actual config stays
+outside this repo, as in P4.
+
+![[#ADR-002: Dotted frontmatter keys]]
+
+![[#Data priority]]
+
+### G7.1: footer.text from frontmatter
+
+The footer already draws its content from the document — `Date` ←
+`document.date`, `Status` ← `document.version`, `DocumentID` ←
+`document.documentID` (in `buildInput()`); `footer.text` is the lone
+config-only content field. Semantics decision: unlike `watermark.text`,
+`footer.text` must NOT enable the footer — the style decides *whether* a
+footer exists, the document only decides *what it says*.
+
+#### G7.1.1: Add footer.text to the frontmatter key set
+
+- [ ] Add `"footer.text": &cfg.Footer.Text` to `frontmatterTargets()` — the
+      one table drives parsing, validation, and application, so no other
+      code change is needed.
+- [ ] Document the key everywhere the frontmatter set is listed: the
+      `extractFrontmatter` doc comment, `all-options.yaml`'s frontmatter
+      notes, and the README's frontmatter section.
+- [ ] Tests: frontmatter `footer.text` overrides the config's text; with
+      `footer.enabled: false` in the config the footer stays off even when
+      frontmatter sets `footer.text`.
+
+### G7.2: frontmatter subcommand — move document metadata into the document
+
+`md2pdf frontmatter [-c config.yaml] <input.md>` writes the frontmatter
+block of the .md and strips the migrated keys from the config, leaving a
+style-only yaml shareable across documents. Merge policy follows data
+priority: keys already present in the .md frontmatter always win and are
+left byte-for-byte untouched, as are unknown/private keys (existing
+documents legitimately carry those). The migration must be render-neutral:
+frontmatter already outranks the config, so moving a key changes nothing
+about the produced PDF.
+
+#### G7.2.1: Frontmatter writer/merger
+
+- [ ] Derive the eligible key set from `frontmatterTargets()` plus
+      `mermaid.scale` (and `footer.text` once G7.1 lands) — one source of
+      truth, no second list to drift.
+- [ ] Write/merge the `---` block: create it when the .md has none; add only
+      eligible keys that are missing; never touch existing or unknown keys.
+      Written values follow the parser's own rules (quoted strings,
+      `"auto"` stays literal, `mermaid.scale` as a bare number).
+- [ ] Without `-c`, fill from built-in defaults: an empty-value scaffold of
+      the `document.*`/`author.*` keys for the author to fill in.
+- [ ] Tests: file without frontmatter, file with partial frontmatter
+      (existing keys preserved verbatim), unknown private keys untouched.
+
+#### G7.2.2: Config cleanup, dry-run, docs
+
+- [ ] With `-c`: after migrating, rewrite the yaml with the migrated keys
+      removed — use the yaml.v3 node API so comments and ordering of
+      untouched settings survive — and drop sections left empty
+      (`document:`, `author:`).
+- [ ] `--dry-run` prints both rewritten files without touching disk.
+- [ ] Document the subcommand in the README and `--help`, including the
+      reusable-style workflow it enables
+      (`md2pdf -c trinova-technical.yaml <doc>.md`).
+- [ ] Test: end-to-end render-neutrality — convert `testdata/report.md`
+      with `testdata/company-config.yaml` before and after migration (on
+      temp copies) and assert the same cover/footer metadata; the migrated
+      yaml contains no `document.*`/`author.*` values.
