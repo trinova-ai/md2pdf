@@ -583,14 +583,14 @@ self-enables, `document.date: "auto"` resolves to today, …).
 
 #### G8.3.1: Per-key reference table
 
-- [ ] Derive the where/when facts from `buildInput()` and the library's
+- [x] Derive the where/when facts from `buildInput()` and the library's
       templates — do not guess: for each of the 19 keys (`document.*` ×9,
       `author.*` ×7, `watermark.text`, `footer.text`, `toc.title` after
       G8.1, plus `mermaid.scale`) trace where the value lands.
-- [ ] Add a "Frontmatter key reference" subsection to the README's
+- [x] Add a "Frontmatter key reference" subsection to the README's
       frontmatter section: one table — key | purpose | appears where | shown
       when — plus the self-enable/no-enable asymmetry called out; link it
       from the Supported-keys rules bullet instead of growing that bullet
       further.
-- [ ] Cross-check `all-options.yaml` comments against the table and fix any
+- [x] Cross-check `all-options.yaml` comments against the table and fix any
       claims that disagree.

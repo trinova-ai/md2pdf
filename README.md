@@ -119,20 +119,53 @@ Rules:
   `document.version: "2.5"` — an unquoted `2.5` is rejected with a hint to
   quote it.
 - Supported keys: every `document.*` and `author.*` field, plus
-  `watermark.text`, which sets the text **and** enables the watermark for that
-  document even when the config leaves the watermark off, and `footer.text`,
-  which overrides the footer text but does **not** enable the footer — the
-  config decides whether a footer exists, the document only what it says.
-  `toc.title` behaves the same way: it renames the table of contents but does
-  **not** enable it — the config decides whether a TOC exists.
+  `watermark.text`, `footer.text`, and `toc.title`. What each key sets, where
+  it lands in the PDF, and when it renders are listed in the
+  [Frontmatter key reference](#frontmatter-key-reference) below.
 - `mermaid.scale` is the one numeric key: it overrides the diagram symbol
   size per document (see [Transformers](#transformers)). Bare numbers are
   fine here: `mermaid.scale: 0.62`.
 - Unknown keys are ignored; run with `--verbose` to list them and catch typos.
-- `document.date: "auto"` resolves to today's date in long format.
 
 In batch mode each file's frontmatter overrides the shared config for that
 file only.
+
+#### Frontmatter key reference
+
+Where each key's value lands in the rendered PDF, and the condition that must
+hold for it to show. "Appears in" names the block a value is rendered in;
+"Shown when" is the gate that block is built behind (a value passed to a
+disabled block is silently dropped).
+
+| Key | Purpose | Appears in | Shown when |
+|---|---|---|---|
+| `document.title` | Document title | Cover title | cover enabled |
+| `document.subtitle` | Subtitle under the title | Cover | cover enabled |
+| `document.version` | Version string | Cover, and footer (as the footer status) | cover enabled; footer enabled |
+| `document.date` | Document date (`"auto"` → today, long format) | Cover, and footer | cover enabled; footer enabled |
+| `document.clientName` | Client / customer name | Cover | cover enabled |
+| `document.projectName` | Project name | Cover | cover enabled |
+| `document.documentType` | Document-type label | Cover | cover enabled |
+| `document.documentID` | Document identifier | Cover, and footer | cover enabled; footer enabled **and** `footer.showDocumentID` set |
+| `document.description` | Brief summary | Cover | cover enabled |
+| `author.name` | Author name | Cover, and signature block | cover enabled; signature enabled |
+| `author.title` | Author role / title | Cover, and signature block | cover enabled; signature enabled |
+| `author.organization` | Organization | Cover, and signature block | cover enabled; signature enabled |
+| `author.email` | Contact email (a `mailto:` link) | Signature block | signature enabled |
+| `author.phone` | Contact phone | Signature block | signature enabled |
+| `author.address` | Postal address | Signature block | signature enabled |
+| `author.department` | Department | Signature block, and cover | signature enabled; cover enabled **and** `cover.showDepartment` set |
+| `watermark.text` | Watermark text | Diagonal watermark on every page | self-enabling (see below) |
+| `footer.text` | Free-form footer text | Footer | footer enabled (does **not** enable the footer) |
+| `toc.title` | Heading above the table of contents | TOC heading | TOC enabled (does **not** enable the TOC) |
+| `mermaid.scale` | Diagram symbol size (CSS px per Mermaid unit) | Rendered Mermaid diagrams | whenever the document renders a Mermaid diagram |
+
+Two asymmetries are worth calling out. `watermark.text` **self-enables**:
+setting it turns the watermark on for that document even when the config leaves
+it off. `footer.text` and `toc.title` do **not** self-enable — the config
+decides whether a footer or TOC exists, the document only decides what it says.
+And `document.date: "auto"` resolves to today's date in long format (e.g.
+`5 January 2025`); any other value is used verbatim.
 
 ### Moving metadata into the document: `md2pdf frontmatter`
 

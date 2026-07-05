@@ -19,7 +19,7 @@
 # of at most 500 characters (quote numbers: `document.version: "2.5"`). Unknown
 # keys are ignored; run with --verbose to list them and catch typos.
 document:
-  title: "API Security Audit Report"       # Empty = auto-detect from H1 or filename
+  title: "API Security Audit Report"       # Cover title (empty = blank; not auto-detected)
   subtitle: "Northwind Trading Platform"    # Optional subtitle
   version: "1.0"                            # Version string (cover and footer)
   date: "auto"                              # "auto" → today's date, long format
@@ -126,7 +126,8 @@ footer:
 # ---------------------------------------------------------------------------
 # signature — Signature block options
 # ---------------------------------------------------------------------------
-# Uses author.name, author.title, author.email, author.organization for display.
+# Uses author.name, author.title, author.email, author.organization, author.phone,
+# author.address, and author.department for display.
 signature:
   enabled: true
   imagePath: "./assets/signature.png"       # Signature image path or URL
