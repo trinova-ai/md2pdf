@@ -3,7 +3,7 @@ module github.com/trinova-ai/md2pdf
 go 1.25.4
 
 require (
-	github.com/trinova-ai/picoloom/v2 v2.1.2-trinova.1
+	github.com/trinova-ai/picoloom/v2 v2.1.3-trinova.1
 	github.com/urfave/cli/v3 v3.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )

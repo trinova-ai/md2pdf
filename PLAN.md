@@ -41,7 +41,7 @@ Implemented, in a single ~500-line `main.go`:
   Config-only invocation: `md2pdf <config>.yaml` resolves the input from
   `input.file` or implicitly `<config-basename>.md` beside the config.
 - **Library** — tagged fork dependency `github.com/trinova-ai/picoloom/v2`
-  (upstream v2.1.2 plus the patch stack; `./picoloom` is the untracked dev
+  (upstream v2.1.3 plus the patch stack; `./picoloom` is the untracked dev
   checkout — ADR-001).
 
 All phases delivered (P1–P3): transformer pipeline and temp workspace
