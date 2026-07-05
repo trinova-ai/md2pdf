@@ -521,3 +521,76 @@ about the produced PDF.
       with `testdata/company-config.yaml` before and after migration (on
       temp copies) and assert the same cover/footer metadata; the migrated
       yaml contains no `document.*`/`author.*` values.
+
+## Phase P8: Frontmatter completeness — toc.title, footer.text proof, key reference
+
+Driver (2026-07-05): Dutch documents. A shared style yaml says
+`toc.title: "Contents"`, but a Dutch document wants "Inhoud" — the TOC
+heading is document language, not house style, so it belongs in frontmatter.
+While here: prove the `footer.text` frontmatter override reaches the rendered
+PDF (code reading says it does — `applyFrontmatter` runs before
+`buildInput()`, which maps `cfg.Footer.Text` into `md2pdf.Footer.Text` — but
+no fixture exercises it), and give the README a per-key reference: what each
+frontmatter property is for, and where and when it appears in the PDF.
+
+![[#ADR-002: Dotted frontmatter keys]]
+
+### G8.1: toc.title from frontmatter
+
+Same semantics class as `footer.text` (G7.1): the style decides *whether* a
+TOC exists, the document decides *what its heading says* — `toc.title` must
+NOT enable the TOC. `buildInput()` already maps `cfg.TOC.Title`, so the
+map-driven pattern applies unchanged.
+
+#### G8.1.1: Add toc.title to the frontmatter key set
+
+- [ ] Add `"toc.title": &cfg.TOC.Title` to `frontmatterTargets()` — parsing,
+      validation, and application come free; confirm the `frontmatter`
+      subcommand picks it up automatically (eligible set and
+      `stripConfigKeys` both derive from the same table) and migrates
+      `toc.title` out of a config.
+- [ ] Document the key everywhere the frontmatter set is listed: the
+      `extractFrontmatter` doc comment, `all-options.yaml` (top frontmatter
+      note and the `toc:` section), and the README's frontmatter rules.
+- [ ] Tests: frontmatter `toc.title: "Inhoud"` overrides the config's title;
+      with `toc.enabled: false` the TOC stays off even when frontmatter sets
+      `toc.title`; the `frontmatter` subcommand migrates and strips it.
+
+### G8.2: footer.text end to end
+
+Code-verified (2026-07-05): the value flows `applyFrontmatter` →
+`cfg.Footer.Text` → `buildInput()` → `md2pdf.Footer.Text`, per-file in batch
+mode via the config copy. What is missing is a fixture proving it in a
+rendered PDF, so a regression can never sneak in behind the unit seam.
+
+#### G8.2.1: Prove the frontmatter footer.text in a rendered PDF
+
+- [ ] Add `footer.text` to a testdata fixture whose config enables the
+      footer but carries a different (or no) text — the frontmatter value
+      must win in the effective config at the renderer seam.
+- [ ] Extend the e2e test to assert the override at the `buildInput()` seam
+      (Config equality, as in the migration render-neutrality test); if
+      cheaply possible, also assert the text appears in the PDF bytes or
+      extracted text — state the chosen proxy in the test comment.
+
+### G8.3: Frontmatter key reference in the README
+
+The README lists which keys exist but not what they do. Write the missing
+half: per key — purpose, where it appears (cover, footer, TOC heading,
+signature block, watermark, diagram scaling), and when (gating: footer keys
+only render when the style enables the footer, `watermark.text`
+self-enables, `document.date: "auto"` resolves to today, …).
+
+#### G8.3.1: Per-key reference table
+
+- [ ] Derive the where/when facts from `buildInput()` and the library's
+      templates — do not guess: for each of the 19 keys (`document.*` ×9,
+      `author.*` ×7, `watermark.text`, `footer.text`, `toc.title` after
+      G8.1, plus `mermaid.scale`) trace where the value lands.
+- [ ] Add a "Frontmatter key reference" subsection to the README's
+      frontmatter section: one table — key | purpose | appears where | shown
+      when — plus the self-enable/no-enable asymmetry called out; link it
+      from the Supported-keys rules bullet instead of growing that bullet
+      further.
+- [ ] Cross-check `all-options.yaml` comments against the table and fix any
+      claims that disagree.
