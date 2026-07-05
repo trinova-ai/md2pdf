@@ -455,6 +455,236 @@ func TestResolveVersion(t *testing.T) {
 	}
 }
 
+// TestFrontmatterValues: the migratable entries of a config are exactly the
+// non-empty frontmatterTargets fields plus a positive mermaid.scale, values
+// verbatim — "auto" is not resolved, the scale is formatted as a bare number
+// string.
+func TestFrontmatterValues(t *testing.T) {
+	t.Run("non-empty eligible fields only", func(t *testing.T) {
+		cfg := &Config{}
+		cfg.Document.Title = "Trust Anchor Strategy"
+		cfg.Document.Date = "auto"
+		cfg.Author.Name = "René Post"
+		cfg.Footer.Text = "TriNova — Draft"
+		cfg.Mermaid.Scale = 0.62
+		cfg.Style = "trinova" // config-level field, never a frontmatter key
+
+		got := frontmatterValues(cfg)
+		want := map[string]string{
+			"document.title": "Trust Anchor Strategy",
+			"document.date":  "auto",
+			"author.name":    "René Post",
+			"footer.text":    "TriNova — Draft",
+			"mermaid.scale":  "0.62",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("frontmatterValues = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("zero config yields nothing", func(t *testing.T) {
+		if got := frontmatterValues(&Config{}); len(got) != 0 {
+			t.Errorf("frontmatterValues(zero) = %v, want empty", got)
+		}
+	})
+}
+
+// TestScaffoldFrontmatterValues pins the no-config scaffold to the full
+// document.*/author.* subset of frontmatterTargets with empty values. The
+// hard-coded want doubles as a drift guard: adding a key to
+// frontmatterTargets fails here until the scaffold expectation is revisited.
+func TestScaffoldFrontmatterValues(t *testing.T) {
+	want := map[string]string{
+		"document.title":        "",
+		"document.subtitle":     "",
+		"document.version":      "",
+		"document.date":         "",
+		"document.documentID":   "",
+		"document.clientName":   "",
+		"document.projectName":  "",
+		"document.documentType": "",
+		"document.description":  "",
+		"author.name":           "",
+		"author.title":          "",
+		"author.organization":   "",
+		"author.email":          "",
+		"author.phone":          "",
+		"author.address":        "",
+		"author.department":     "",
+	}
+	got := scaffoldFrontmatterValues()
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("scaffoldFrontmatterValues = %v, want %v", got, want)
+	}
+
+	// The scaffold must stay a strict subset of the reader's key set.
+	known := frontmatterTargets(&Config{})
+	for key := range got {
+		if _, ok := known[key]; !ok {
+			t.Errorf("scaffold key %q is not in frontmatterTargets", key)
+		}
+	}
+}
+
+// TestMergeFrontmatter: the writer/merger core. Creation, partial merge with
+// byte-for-byte preservation of existing lines, untouched unknown keys,
+// value formatting per the parser's rules, and the error cases.
+func TestMergeFrontmatter(t *testing.T) {
+	t.Run("creates block when file has none", func(t *testing.T) {
+		values := map[string]string{
+			"document.title": "Trust Anchor Strategy",
+			"document.date":  "auto",
+			"author.name":    "René Post",
+			"footer.text":    "TriNova — Draft",
+			"mermaid.scale":  "0.62",
+		}
+		merged, added, err := mergeFrontmatter("# Title\n\nBody text.\n", values)
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		want := "---\n" +
+			"document.date: \"auto\"\n" +
+			"document.title: \"Trust Anchor Strategy\"\n" +
+			"author.name: \"René Post\"\n" +
+			"footer.text: \"TriNova — Draft\"\n" +
+			"mermaid.scale: 0.62\n" +
+			"---\n\n# Title\n\nBody text.\n"
+		if merged != want {
+			t.Errorf("merged = %q, want %q", merged, want)
+		}
+		wantAdded := []string{"document.date", "document.title", "author.name", "footer.text", "mermaid.scale"}
+		if !reflect.DeepEqual(added, wantAdded) {
+			t.Errorf("added = %v, want %v", added, wantAdded)
+		}
+
+		// Round-trip through the reader: every written value parses back
+		// verbatim — quoting preserved "auto" as a literal string and the
+		// bare scale as the known numeric key.
+		_, fm, unknown, err := extractFrontmatter(merged)
+		if err != nil {
+			t.Fatalf("extractFrontmatter(merged): %v", err)
+		}
+		if !reflect.DeepEqual(fm, values) {
+			t.Errorf("round-trip fm = %v, want %v", fm, values)
+		}
+		if len(unknown) != 0 {
+			t.Errorf("round-trip unknown = %v, want none", unknown)
+		}
+	})
+
+	t.Run("partial frontmatter keeps existing keys verbatim", func(t *testing.T) {
+		content := "---\n" +
+			"document.title:     'Spaced  &  quoted'   # keep me\n" +
+			"document.date:\n" +
+			"---\n# Body\n"
+		values := map[string]string{
+			"document.title": "New Title", // present: must not be touched
+			"document.date":  "auto",      // present as bare scaffold: must not be re-added
+			"author.name":    "A",         // missing: appended
+		}
+		merged, added, err := mergeFrontmatter(content, values)
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		want := "---\n" +
+			"document.title:     'Spaced  &  quoted'   # keep me\n" +
+			"document.date:\n" +
+			"author.name: \"A\"\n" +
+			"---\n# Body\n"
+		if merged != want {
+			t.Errorf("merged = %q, want %q", merged, want)
+		}
+		if wantAdded := []string{"author.name"}; !reflect.DeepEqual(added, wantAdded) {
+			t.Errorf("added = %v, want %v", added, wantAdded)
+		}
+	})
+
+	t.Run("unknown private keys untouched", func(t *testing.T) {
+		history := "version-history: \"" + strings.Repeat("h", maxFrontmatterValueLen+100) + "\""
+		content := "---\nstatus: Draft\nweight: 2.5\n" + history + "\n---\nbody\n"
+		merged, added, err := mergeFrontmatter(content, map[string]string{"document.title": "T"})
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		want := "---\nstatus: Draft\nweight: 2.5\n" + history + "\ndocument.title: \"T\"\n---\nbody\n"
+		if merged != want {
+			t.Errorf("merged = %q, want %q", merged, want)
+		}
+		if wantAdded := []string{"document.title"}; !reflect.DeepEqual(added, wantAdded) {
+			t.Errorf("added = %v, want %v", added, wantAdded)
+		}
+	})
+
+	t.Run("nothing missing returns content unchanged", func(t *testing.T) {
+		content := "---\ndocument.title: \"T\"\n---\nbody\n"
+		merged, added, err := mergeFrontmatter(content, map[string]string{"document.title": "Other"})
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		if merged != content {
+			t.Errorf("merged = %q, want unchanged input", merged)
+		}
+		if len(added) != 0 {
+			t.Errorf("added = %v, want none", added)
+		}
+	})
+
+	t.Run("scaffold into empty file", func(t *testing.T) {
+		merged, added, err := mergeFrontmatter("", scaffoldFrontmatterValues())
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		if len(added) != len(scaffoldFrontmatterValues()) {
+			t.Errorf("added %d keys, want %d", len(added), len(scaffoldFrontmatterValues()))
+		}
+		if !strings.HasPrefix(merged, "---\n") || !strings.HasSuffix(merged, "---\n") {
+			t.Errorf("merged = %q, want a bare frontmatter block with no trailing blank line", merged)
+		}
+		if !strings.Contains(merged, "document.title: \"\"\n") {
+			t.Errorf("merged = %q, missing empty-value scaffold line for document.title", merged)
+		}
+		// Empty scaffold values must parse cleanly and stay render-neutral.
+		_, fm, unknown, err := extractFrontmatter(merged)
+		if err != nil {
+			t.Fatalf("extractFrontmatter(merged): %v", err)
+		}
+		if len(unknown) != 0 {
+			t.Errorf("unknown = %v, want none", unknown)
+		}
+		var cfg Config
+		applyFrontmatter(fm, &cfg)
+		if !reflect.DeepEqual(cfg, Config{}) {
+			t.Errorf("scaffold applied to zero config = %+v, want untouched zero config", cfg)
+		}
+	})
+
+	t.Run("crlf block gets crlf lines", func(t *testing.T) {
+		content := "---\r\ndocument.title: \"T\"\r\n---\r\nbody\r\n"
+		merged, _, err := mergeFrontmatter(content, map[string]string{"author.name": "A"})
+		if err != nil {
+			t.Fatalf("mergeFrontmatter: %v", err)
+		}
+		want := "---\r\ndocument.title: \"T\"\r\nauthor.name: \"A\"\r\n---\r\nbody\r\n"
+		if merged != want {
+			t.Errorf("merged = %q, want %q", merged, want)
+		}
+	})
+
+	t.Run("unclosed frontmatter errors", func(t *testing.T) {
+		_, _, err := mergeFrontmatter("---\ndocument.title: \"T\"\nno closing delimiter\n", map[string]string{"author.name": "A"})
+		if err == nil || !strings.Contains(err.Error(), "closing") {
+			t.Errorf("err = %v, want missing-closing-delimiter error", err)
+		}
+	})
+
+	t.Run("invalid yaml in existing block errors", func(t *testing.T) {
+		_, _, err := mergeFrontmatter("---\n{\n---\nbody\n", map[string]string{"author.name": "A"})
+		if err == nil || !strings.Contains(err.Error(), "frontmatter") {
+			t.Errorf("err = %v, want frontmatter parse error", err)
+		}
+	})
+}
+
 // TestConvertReportEndToEnd drives the real CLI over the testdata pair:
 // company-config.yaml (org defaults: cover, TOC, footer) + report.md
 // (frontmatter metadata, DRAFT watermark, a mermaid diagram). It exercises

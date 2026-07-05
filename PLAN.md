@@ -495,16 +495,16 @@ about the produced PDF.
 
 #### G7.2.1: Frontmatter writer/merger
 
-- [ ] Derive the eligible key set from `frontmatterTargets()` plus
+- [x] Derive the eligible key set from `frontmatterTargets()` plus
       `mermaid.scale` (and `footer.text` once G7.1 lands) — one source of
       truth, no second list to drift.
-- [ ] Write/merge the `---` block: create it when the .md has none; add only
+- [x] Write/merge the `---` block: create it when the .md has none; add only
       eligible keys that are missing; never touch existing or unknown keys.
       Written values follow the parser's own rules (quoted strings,
       `"auto"` stays literal, `mermaid.scale` as a bare number).
-- [ ] Without `-c`, fill from built-in defaults: an empty-value scaffold of
+- [x] Without `-c`, fill from built-in defaults: an empty-value scaffold of
       the `document.*`/`author.*` keys for the author to fill in.
-- [ ] Tests: file without frontmatter, file with partial frontmatter
+- [x] Tests: file without frontmatter, file with partial frontmatter
       (existing keys preserved verbatim), unknown private keys untouched.
 
 #### G7.2.2: Config cleanup, dry-run, docs
