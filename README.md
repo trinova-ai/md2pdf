@@ -123,6 +123,8 @@ Rules:
   document even when the config leaves the watermark off, and `footer.text`,
   which overrides the footer text but does **not** enable the footer — the
   config decides whether a footer exists, the document only what it says.
+  `toc.title` behaves the same way: it renames the table of contents but does
+  **not** enable it — the config decides whether a TOC exists.
 - `mermaid.scale` is the one numeric key: it overrides the diagram symbol
   size per document (see [Transformers](#transformers)). Bare numbers are
   fine here: `mermaid.scale: 0.62`.
@@ -145,9 +147,9 @@ md2pdf -c trinova-technical.yaml other-doc.md            # config now reusable
 ```
 
 With `-c`, every eligible key the config carries (`document.*`, `author.*`,
-`watermark.text`, `footer.text`, `mermaid.scale`) is added to the document's
-frontmatter block — created if the file has none — and stripped from the
-config. The rewrite preserves comments and the ordering of untouched
+`watermark.text`, `footer.text`, `toc.title`, `mermaid.scale`) is added to the
+document's frontmatter block — created if the file has none — and stripped
+from the config. The rewrite preserves comments and the ordering of untouched
 settings, and drops sections left empty (`document:`, `author:`).
 
 The migration is render-neutral: frontmatter outranks the config, so moving

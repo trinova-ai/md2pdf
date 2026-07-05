@@ -51,7 +51,7 @@ func scaffoldFrontmatterValues() map[string]string {
 }
 
 // sortFrontmatterKeys orders keys for writing: document.* first, then
-// author.*, then everything else (watermark.text, footer.text,
+// author.*, then everything else (watermark.text, footer.text, toc.title,
 // mermaid.scale) — mirroring the config file layout — alphabetically within
 // each group. Purely an ordering rule over whatever keys exist; the key set
 // itself always comes from frontmatterTargets.

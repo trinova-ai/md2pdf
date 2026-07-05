@@ -544,15 +544,15 @@ map-driven pattern applies unchanged.
 
 #### G8.1.1: Add toc.title to the frontmatter key set
 
-- [ ] Add `"toc.title": &cfg.TOC.Title` to `frontmatterTargets()` — parsing,
+- [x] Add `"toc.title": &cfg.TOC.Title` to `frontmatterTargets()` — parsing,
       validation, and application come free; confirm the `frontmatter`
       subcommand picks it up automatically (eligible set and
       `stripConfigKeys` both derive from the same table) and migrates
       `toc.title` out of a config.
-- [ ] Document the key everywhere the frontmatter set is listed: the
+- [x] Document the key everywhere the frontmatter set is listed: the
       `extractFrontmatter` doc comment, `all-options.yaml` (top frontmatter
       note and the `toc:` section), and the README's frontmatter rules.
-- [ ] Tests: frontmatter `toc.title: "Inhoud"` overrides the config's title;
+- [x] Tests: frontmatter `toc.title: "Inhoud"` overrides the config's title;
       with `toc.enabled: false` the TOC stays off even when frontmatter sets
       `toc.title`; the `frontmatter` subcommand migrates and strips it.
 

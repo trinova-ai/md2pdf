@@ -228,9 +228,9 @@ func newApp() *cli.Command {
 				ArgsUsage: "<input.md>",
 				Description: "Migrates document-specific metadata into the document itself. With -c,\n" +
 					"every eligible key the config carries — document.*, author.*,\n" +
-					"watermark.text, footer.text, mermaid.scale — is added to the document's\n" +
-					"frontmatter block (created when missing) and stripped from the config,\n" +
-					"leaving a style-only config shareable across documents:\n\n" +
+					"watermark.text, footer.text, toc.title, mermaid.scale — is added to\n" +
+					"the document's frontmatter block (created when missing) and stripped\n" +
+					"from the config, leaving a style-only config shareable across documents:\n\n" +
 					"   md2pdf frontmatter -c trinova-technical.yaml report.md\n" +
 					"   md2pdf -c trinova-technical.yaml report.md   # renders the same PDF\n\n" +
 					"The migration is render-neutral: frontmatter outranks the config, so\n" +
@@ -703,9 +703,9 @@ func resolveInputPath(path, defaultDir string) string {
 // extractFrontmatter splits YAML frontmatter (between --- delimiters) from body.
 // The frontmatter uses flat dotted keys naming the config field they override;
 // the full set is frontmatterTargets() (document.*, author.*, watermark.text,
-// footer.text) plus the numeric mermaid.scale. Known keys are validated (string
-// type, length cap); unknown keys are ignored per ADR-002 and returned sorted
-// so --verbose can list them.
+// footer.text, toc.title) plus the numeric mermaid.scale. Known keys are
+// validated (string type, length cap); unknown keys are ignored per ADR-002
+// and returned sorted so --verbose can list them.
 func extractFrontmatter(content string) (body string, fm map[string]string, unknown []string, err error) {
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	if !scanner.Scan() || strings.TrimSpace(scanner.Text()) != "---" {
@@ -839,6 +839,7 @@ func frontmatterTargets(cfg *Config) map[string]*string {
 		"author.department":     &cfg.Author.Department,
 		"watermark.text":        &cfg.Watermark.Text,
 		"footer.text":           &cfg.Footer.Text,
+		"toc.title":             &cfg.TOC.Title,
 	}
 }
 
@@ -858,7 +859,10 @@ func applyFrontmatter(fm map[string]string, cfg *Config) {
 	}
 
 	// footer.text deliberately does NOT enable the footer: the style decides
-	// whether a footer exists, the document only decides what it says.
+	// whether a footer exists, the document only decides what it says. The
+	// same holds for toc.title — it renames a TOC the style already enables
+	// but never turns one on (buildInput builds the TOC only when
+	// cfg.TOC.Enabled).
 
 	// mermaid.scale is numeric; parseFrontmatter validated it as a positive
 	// number, so a parse failure here cannot happen and is simply ignored.

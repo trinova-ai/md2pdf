@@ -14,10 +14,10 @@
 # document — Shared document metadata (used by cover page and footer)
 # ---------------------------------------------------------------------------
 # Frontmatter: a document can override any document.* or author.* field (plus
-# watermark.text and footer.text) with dotted keys in its YAML frontmatter,
-# e.g. `document.title: "My Title"`. Values must be quoted strings of at most
-# 500 characters (quote numbers: `document.version: "2.5"`). Unknown keys are
-# ignored; run with --verbose to list them and catch typos.
+# watermark.text, footer.text, and toc.title) with dotted keys in its YAML
+# frontmatter, e.g. `document.title: "My Title"`. Values must be quoted strings
+# of at most 500 characters (quote numbers: `document.version: "2.5"`). Unknown
+# keys are ignored; run with --verbose to list them and catch typos.
 document:
   title: "API Security Audit Report"       # Empty = auto-detect from H1 or filename
   subtitle: "Northwind Trading Platform"    # Optional subtitle
@@ -96,6 +96,9 @@ cover:
 # ---------------------------------------------------------------------------
 # toc — Table of contents options
 # ---------------------------------------------------------------------------
+# Frontmatter: `toc.title: "..."` overrides the heading per document, but does
+# NOT enable the TOC (like footer.text) — this config decides whether a TOC
+# exists, the document only decides what its heading says.
 toc:
   enabled: true
   title: "Contents"                         # Empty = no title above TOC

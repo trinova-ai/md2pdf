@@ -238,6 +238,46 @@ func TestApplyFrontmatterFooterText(t *testing.T) {
 	})
 }
 
+// TestApplyFrontmatterTOCTitle: toc.title overrides the TOC heading per
+// document but, like footer.text, must NOT enable the TOC — the config
+// decides whether a TOC exists, the document only what its heading says.
+func TestApplyFrontmatterTOCTitle(t *testing.T) {
+	t.Run("overrides configured title", func(t *testing.T) {
+		cfg := Config{TOC: TOCConfig{Enabled: true, Title: "Contents"}}
+		applyFrontmatter(map[string]string{"toc.title": "Inhoud"}, &cfg)
+		if cfg.TOC.Title != "Inhoud" {
+			t.Errorf("TOC.Title = %q, want %q", cfg.TOC.Title, "Inhoud")
+		}
+		if !cfg.TOC.Enabled {
+			t.Error("TOC.Enabled = false, want true (untouched)")
+		}
+	})
+
+	t.Run("does not enable a disabled TOC", func(t *testing.T) {
+		cfg := Config{TOC: TOCConfig{Enabled: false, Title: "Contents"}}
+		applyFrontmatter(map[string]string{"toc.title": "Inhoud"}, &cfg)
+		if cfg.TOC.Enabled {
+			t.Error("TOC.Enabled = true, want false — toc.title must not enable the TOC")
+		}
+		if cfg.TOC.Title != "Inhoud" {
+			t.Errorf("TOC.Title = %q, want %q", cfg.TOC.Title, "Inhoud")
+		}
+		// buildInput builds the TOC only when enabled: the renamed-but-disabled
+		// TOC must not surface in the input at all.
+		if in := buildInput("# Body\n", "doc.md", "", &cfg); in.TOC != nil {
+			t.Error("buildInput produced a TOC though toc.enabled is false")
+		}
+	})
+
+	t.Run("empty value is ignored", func(t *testing.T) {
+		cfg := Config{TOC: TOCConfig{Enabled: true, Title: "Kept"}}
+		applyFrontmatter(map[string]string{"toc.title": ""}, &cfg)
+		if cfg.TOC.Title != "Kept" {
+			t.Errorf("TOC.Title = %q, want %q", cfg.TOC.Title, "Kept")
+		}
+	})
+}
+
 // TestParseFrontmatterOverlongKnownValue: a known key whose value exceeds the
 // cap is rejected, naming the key; a value exactly at the cap passes.
 func TestParseFrontmatterOverlongKnownValue(t *testing.T) {
@@ -964,6 +1004,54 @@ func TestRunFrontmatterCommand(t *testing.T) {
 			t.Errorf("err = %v, want missing <input.md> error", err)
 		}
 	})
+}
+
+// TestFrontmatterMigratesTOCTitle drives the subcommand on a style-only config:
+// toc.title moves into the document and is stripped from the config, while
+// toc.enabled — the gate that decides whether a TOC exists — is not a
+// frontmatter key and stays put, leaving the config still able to switch the
+// TOC on for every document it styles.
+func TestFrontmatterMigratesTOCTitle(t *testing.T) {
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(mdPath, []byte("# Title\n\nBody.\n"), 0o644); err != nil {
+		t.Fatalf("write markdown: %v", err)
+	}
+	cfgPath := filepath.Join(dir, "style.yaml")
+	cfgSrc := "style: \"corporate\"\ntoc:\n  enabled: true\n  title: \"Contents\"\n  maxDepth: 3\n"
+	if err := os.WriteFile(cfgPath, []byte(cfgSrc), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if err := newApp().Run(context.Background(), []string{"md2pdf", "frontmatter", "-c", cfgPath, mdPath}); err != nil {
+		t.Fatalf("frontmatter subcommand: %v", err)
+	}
+
+	mdOut, err := os.ReadFile(mdPath)
+	if err != nil {
+		t.Fatalf("read migrated markdown: %v", err)
+	}
+	if !strings.Contains(string(mdOut), "toc.title: \"Contents\"") {
+		t.Errorf("migrated markdown missing toc.title:\n%s", mdOut)
+	}
+
+	cfgOut, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("read rewritten config: %v", err)
+	}
+	if strings.Contains(string(cfgOut), "Contents") {
+		t.Errorf("rewritten config still carries toc.title:\n%s", cfgOut)
+	}
+	var parsed Config
+	if err := yaml.Unmarshal(cfgOut, &parsed); err != nil {
+		t.Fatalf("rewritten config does not parse: %v", err)
+	}
+	if parsed.TOC.Title != "" {
+		t.Errorf("TOC.Title = %q, want stripped", parsed.TOC.Title)
+	}
+	if !parsed.TOC.Enabled {
+		t.Errorf("TOC.Enabled = false — the gate must survive migration:\n%s", cfgOut)
+	}
 }
 
 // TestFrontmatterMigrationRenderNeutral is the end-to-end render-neutrality
