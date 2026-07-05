@@ -20,6 +20,18 @@ OLD=github.com/alnah/picoloom/v2
 NEW=github.com/trinova-ai/picoloom/v2
 
 cd "$FORK"
+# Guards: turn checkout-bootstrap mistakes into errors (see README, Vendored
+# library — bootstrap) instead of half-done releases.
+git remote get-url upstream >/dev/null 2>&1 || {
+	echo "release-picoloom: no 'upstream' remote in $FORK — bootstrap per README (Vendored library)" >&2; exit 1; }
+git rev-parse -q --verify refs/heads/trinova >/dev/null || {
+	echo "release-picoloom: no local 'trinova' branch in $FORK — bootstrap per README (Vendored library)" >&2; exit 1; }
+case "$(git config user.email)" in
+*users.noreply.github.com) ;;
+*)
+	echo "release-picoloom: user.email '$(git config user.email)' would publish a private email (GH007) — use a GitHub noreply address" >&2
+	exit 1 ;;
+esac
 [ -z "$(git status --porcelain)" ] || { echo "release-picoloom: fork tree not clean" >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
 	echo "release-picoloom: tag $TAG already exists — published tags are immutable, mint the next one" >&2

@@ -185,7 +185,7 @@ Sync with upstream (in the fork checkout, then release):
 git fetch upstream
 git checkout main    && git merge --ff-only upstream/main && git push origin main
 git checkout trinova && git rebase main && git push --force-with-lease origin trinova
-go test ./...                                # conflicts land most often in internal/pipeline/tocinject.go
+GOWORK=off go test ./...                     # conflicts land most often in internal/pipeline/tocinject.go
 cd .. && scripts/release-picoloom.sh v2.X.Y-trinova.N   # then commit the go.mod bump
 ```
 
@@ -194,6 +194,25 @@ personal (never committed) `go.work` with `use .` and `use ./picoloom` —
 builds then pick up local library edits instantly. `GOWORK=off` opts out and
 builds against the pinned tag, i.e. exactly what users get; the release
 script and any release verification use it.
+
+Bootstrap on a fresh clone of this repo (the fork checkout and `go.work` are
+untracked, so they don't come with it):
+
+```sh
+git clone git@github.com:trinova-ai/picoloom.git picoloom
+cd picoloom
+git remote add upstream git@github.com:alnah/picoloom.git
+git remote set-url --push upstream DISABLED   # rebases fetch upstream, never push to it
+git fetch upstream
+git checkout trinova                          # the patch stack
+git branch dev v2.1.3-trinova.1               # latest release tag — every tag IS a dev snapshot
+git checkout dev
+cd ..
+printf 'go 1.25.4\n\nuse (\n\t.\n\t./picoloom\n)\n' > go.work
+```
+
+Commit emails must be a GitHub noreply address (the fork rejects private
+emails via GH007); the release script checks this before doing anything.
 
 The patch stack is a permanent feature branch: it is not upstreamed, and the
 sync procedure above carries it forward across upstream releases.
